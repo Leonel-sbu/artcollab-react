@@ -1,0 +1,67 @@
+import { app } from './firebaseConfig';
+import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    sendPasswordResetEmail,
+    updateProfile,
+    onAuthStateChanged
+} from 'firebase/auth';
+
+// Initialize Firebase Authentication
+const auth = getAuth(app);
+
+// Auth functions
+export const registerUser = async (email, password, displayName) => {
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+        // Update profile with display name
+        await updateProfile(userCredential.user, {
+            displayName: displayName
+        });
+
+        return { success: true, user: userCredential.user };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
+
+export const loginUser = async (email, password) => {
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        return { success: true, user: userCredential.user };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
+
+export const logoutUser = async () => {
+    try {
+        await signOut(auth);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
+
+export const resetPassword = async (email) => {
+    try {
+        await sendPasswordResetEmail(auth, email);
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
+
+export const getCurrentUser = () => {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            resolve(user);
+        });
+    });
+};
+
+export { auth, onAuthStateChanged };
