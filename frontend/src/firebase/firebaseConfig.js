@@ -1,11 +1,11 @@
 // src/firebase/firebaseConfig.js
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getStorage, connectStorageEmulator } from "firebase/storage";
 
-// Your web app's Firebase configuration from environment variables
+// Firebase configuration (env vars)
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -20,9 +20,23 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // Initialize services
-const analytics = getAnalytics(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+
+// ✅ CONNECT TO EMULATORS (DEV ONLY)
+if (import.meta.env.DEV) {
+    console.log("🔥 Using Firebase Emulators");
+
+    connectAuthEmulator(auth, "http://127.0.0.1:9099");
+    connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199); // optional
+}
+
+// Analytics (ONLY in production)
+const analytics =
+    import.meta.env.PROD && firebaseConfig.measurementId
+        ? getAnalytics(app)
+        : null;
 
 export { app, analytics, auth, db, storage };
