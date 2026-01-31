@@ -1,66 +1,126 @@
-﻿// src/App.jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import { AuthProvider } from './context/AuthContext'
+﻿import { Routes, Route, Navigate } from "react-router-dom";
 
-// Layouts
-import MainLayout from './layouts/MainLayout'
-import AuthLayout from './layouts/AuthLayout'
+import Navbar from "./components/common/Navbar.jsx";
+import Footer from "./components/common/Footer.jsx";
+import ProtectedRoute from "./components/common/ProtectedRoute.jsx";
+import AdminRoute from "./components/common/AdminRoute.jsx";
 
-// Pages
-import Home from './pages/Home'
-import Marketplace from './pages/Marketplace'
-import Dashboard from './pages/Dashboard'
-import VRStudio from './pages/VRStudio'
-import Learn from './pages/Learn'
-import Services from './pages/Services'
-import Community from './pages/Community'
-import UploadArtwork from './pages/UploadArtwork'
-import Login from './components/auth/Login'
-import Register from './components/auth/Register'
-import ForgotPassword from './components/auth/ForgotPassword'
+import Home from "./pages/home/Home.jsx";
 
-function App() {
-    return (
-        <BrowserRouter>
-            <AuthProvider>
-                <Toaster
-                    position="top-right"
-                    toastOptions={{
-                        duration: 3000,
-                        style: {
-                            background: '#1f2937',
-                            color: '#fff',
-                            border: '1px solid #374151'
-                        }
-                    }}
-                />
+import Login from "./pages/auth/Login.jsx";
+import Register from "./pages/auth/Register.jsx";
 
-                <Routes>
-                    {/* Home (NO navbar/footer) */}
-                    <Route path="/" element={<Home />} />
+import Courses from "./pages/courses/Courses.jsx";
+import CourseDetails from "./pages/courses/CourseDetails.jsx";
 
-                    {/* Main layout (WITH navbar/footer) */}
-                    <Route element={<MainLayout />}>
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/marketplace" element={<Marketplace />} />
-                        <Route path="/vr-studio" element={<VRStudio />} />
-                        <Route path="/learn" element={<Learn />} />
-                        <Route path="/services" element={<Services />} />
-                        <Route path="/community" element={<Community />} />
-                        <Route path="/upload" element={<UploadArtwork />} />
-                    </Route>
+import Marketplace from "./pages/marketplace/Marketplace.jsx";
+import ArtworkDetails from "./pages/marketplace/ArtworkDetails.jsx";
 
-                    {/* Auth pages (NO navbar/footer) */}
-                    <Route element={<AuthLayout />}>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/forgot-password" element={<ForgotPassword />} />
-                    </Route>
-                </Routes>
-            </AuthProvider>
-        </BrowserRouter>
-    )
+import Cart from "./pages/cart/Cart.jsx";
+import Checkout from "./pages/cart/Checkout.jsx";
+
+import Orders from "./pages/orders/Orders.jsx";
+import OrderDetails from "./pages/orders/OrderDetails.jsx";
+
+import Messages from "./pages/messaging/Messages.jsx";
+import Admin from "./pages/admin/Admin.jsx";
+import Profile from "./pages/profile/Profile.jsx";
+
+import VRGalleryPage from "./pages/vr/VRGalleryPage.jsx";
+import NotFound from "./pages/NotFound.jsx";
+
+function PublicOnly({ children }) {
+  const token = localStorage.getItem("token");
+  if (token) return <Navigate to="/marketplace" replace />;
+  return children;
 }
 
-export default App
+export default function App() {
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar />
+      <main className="flex-1">
+        <Routes>
+          <Route path="/" element={<Home />} />
+
+          <Route path="/login" element={<PublicOnly><Login /></PublicOnly>} />
+          <Route path="/register" element={<PublicOnly><Register /></PublicOnly>} />
+
+          <Route path="/marketplace" element={<Marketplace />} />
+          <Route path="/artworks/:id" element={<ArtworkDetails />} />
+
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:id" element={<CourseDetails />} />
+
+          {/* Cart = public, Checkout = protected */}
+          <Route path="/cart" element={<Cart />} />
+          <Route
+            path="/checkout"
+            element={
+              <ProtectedRoute>
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <Orders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:id"
+            element={
+              <ProtectedRoute>
+                <OrderDetails />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <Messages />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
+            }
+          />
+
+          <Route
+            path="/vr"
+            element={
+              <ProtectedRoute>
+                <VRGalleryPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
+  );
+}
