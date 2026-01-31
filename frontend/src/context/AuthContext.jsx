@@ -1,69 +1,114 @@
-﻿import { createContext, useContext, useState } from 'react'
+﻿import { createContext, useEffect, useMemo, useState } from "react";
+import { api } from "../services/api";
 
-const AuthContext = createContext({})
+export const AuthContext = createContext(null);
 
-export const useAuth = () => useContext(AuthContext)
+function getStoredToken() {
+  return localStorage.getItem("token");
+}
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(false)
+function persistToken(token) {
+  if (token) localStorage.setItem("token", token);
+  else localStorage.removeItem("token");
+}
 
-  const login = async (email, password) => {
-    setLoading(true)
+export default function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  async function hydrate() {
+    const token = getStoredToken();
+
+    if (!token) {
+      setUser(null);
+      setAuthLoading(false);
+      return;
+    }
+
     try {
-      // Mock login for now
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      const mockUser = {
-        uid: '123',
-        email: email,
-        displayName: email.split('@')[0],
-        role: 'artist'
-      }
-      setUser(mockUser)
-      return { success: true, user: mockUser }
-    } catch (error) {
-      return { success: false, error: 'Login failed' }
+      const me = await api("/auth/me");
+      setUser(me?.user || me);
+    } catch (e) {
+      // token invalid/expired => clear
+      persistToken(null);
+      setUser(null);
     } finally {
-      setLoading(false)
+      setAuthLoading(false);
     }
   }
 
-  const register = async (email, password, name) => {
-    setLoading(true)
-    try {
-      // Mock registration for now
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      const mockUser = {
-        uid: '456',
-        email: email,
-        displayName: name,
-        role: 'artist'
-      }
-      setUser(mockUser)
-      return { success: true, user: mockUser }
-    } catch (error) {
-      return { success: false, error: 'Registration failed' }
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    hydrate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function login(email, password) {
+    const res = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+
+    const token = res?.token || res?.accessToken;
+    const u = res?.user;
+
+    if (!token) throw new Error("Login did not return a token.");
+
+    persistToken(token);
+
+    if (u) {
+      setUser(u);
+      return u;
     }
+
+    const me = await api("/auth/me");
+    const meUser = me?.user || me;
+    setUser(meUser);
+    return meUser;
   }
 
-  const logout = async () => {
-    setUser(null)
-    return { success: true }
+  async function register(payload) {
+    const res = await api("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    const token = res?.token || res?.accessToken;
+    const u = res?.user;
+
+    if (token) {
+      persistToken(token);
+
+      if (u) {
+        setUser(u);
+        return u;
+      }
+
+      const me = await api("/auth/me");
+      const meUser = me?.user || me;
+      setUser(meUser);
+      return meUser;
+    }
+
+    return null;
   }
 
-  const value = {
-    user,
-    loading,
-    login,
-    register,
-    logout
+  function logout() {
+    persistToken(null);
+    setUser(null);
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  const value = useMemo(
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      authLoading,
+      login,
+      register,
+      logout,
+      refreshMe: hydrate,
+    }),
+    [user, authLoading]
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
