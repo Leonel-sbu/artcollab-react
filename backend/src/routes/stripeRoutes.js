@@ -1,19 +1,20 @@
 ﻿const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const c = require('../controllers/stripeController');
 
 router.get('/', (req, res) => {
   res.json({ success: true, module: 'payments' });
 });
 
-router.post('/create-payment-intent', auth, c.createPaymentIntent);
+router.post('/create-payment-intent', protect, c.createPaymentIntent);
 
 // confirm after client payment
-router.post('/confirm', auth, c.confirmPayment);
+router.post('/confirm', protect, c.confirmPayment);
 
 
-router.post('/refund', auth, c.refund);
+router.post('/refund', protect, c.refund);
 module.exports = router;
+
 
 
 

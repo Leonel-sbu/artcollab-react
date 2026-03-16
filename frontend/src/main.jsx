@@ -1,26 +1,22 @@
-﻿import "./index.css";
-import React from "react";
+﻿import React from "react";
 import ReactDOM from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-
 import App from "./App.jsx";
-import AuthProvider from "./context/AuthContext.jsx";
-import CartProvider from "./context/CartContext.jsx";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { ThemeProvider } from "./context/ThemeContext";
+import AuthProvider from "./context/AuthContext";
+import "./index.css";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-const queryClient = new QueryClient();
+const shell = document.getElementById("preload-shell");
+if (shell) shell.remove();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+    <ErrorBoundary>
+      <ThemeProvider>
         <AuthProvider>
-          <CartProvider>
-            <App />
-          </CartProvider>
+          <App />
         </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

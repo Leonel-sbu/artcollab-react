@@ -136,11 +136,6 @@ exports.refund = async (req, res) => {
   const order = await Order.findOne({ _id: orderId, user: req.user.id });
   if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
-  // If we already marked it refunded locally, return OK (idempotent)
-  if (order.status === "refunded") {
-    return res.json({ success: true, alreadyRefunded: true, orderId: String(order._id) });
-  }
-
   if (order.status !== "paid") {
     return res.status(400).json({ success: false, message: "Only paid orders can be refunded" });
   }
@@ -148,20 +143,24 @@ exports.refund = async (req, res) => {
     return res.status(400).json({ success: false, message: "No paymentRef on order" });
   }
 
+  // Step 1: mark refund_pending
+  order.status = "refund_pending";
+  await order.save();
+
   try {
+    // Step 2: create Stripe refund
     const refund = await stripe.refunds.create({ payment_intent: order.paymentRef });
 
+    // Step 3: mark refunded
     order.status = "refunded";
     await order.save();
 
-    return res.json({ success: true, refundId: refund.id, status: refund.status, orderId: String(order._id) });
+    return res.json({ success: true, refundId: refund.id, status: refund.status });
   } catch (e) {
-    // Stripe already refunded -> treat as success + update DB
-    if (e?.message?.toLowerCase().includes("already been refunded")) {
-      order.status = "refunded";
-      await order.save();
-      return res.json({ success: true, alreadyRefunded: true, orderId: String(order._id) });
-    }
-    throw e;
+    // rollback status if Stripe failed
+    order.status = "paid";
+    await order.save();
+
+    return res.status(400).json({ success: false, message: e.message });
   }
 };

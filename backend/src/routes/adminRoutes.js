@@ -1,15 +1,23 @@
 ﻿const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
-const requireRole = require('../middleware/roleMiddleware');
+const { protect } = require('../middleware/protect');
+const { authorize } = require('../middleware/authorize');
+const { adminLimiter } = require('../config/rateLimits');
 const c = require('../controllers/adminController');
 
-router.get('/stats', auth, requireRole('admin'), c.stats);
-router.get('/users', auth, requireRole('admin'), c.listUsers);
+// All admin routes require authentication and admin role
+router.use(protect);
+router.use(authorize('admin'));
 
-router.get('/artworks/pending', auth, requireRole('admin'), c.pendingArtworks);
-router.put('/artworks/:id/status', auth, requireRole('admin'), c.setArtworkStatus);
+// Apply rate limiting to state-changing admin actions
+router.put('/users/:id/role', adminLimiter, c.updateUserRole);
+router.delete('/users/:id', adminLimiter, c.deleteUser);
+router.put('/artworks/:id/status', adminLimiter, c.setArtworkStatus);
+router.put('/reports/:id/status', adminLimiter, c.setReportStatus);
 
-router.get('/reports', auth, requireRole('admin'), c.listReports);
-router.put('/reports/:id/status', auth, requireRole('admin'), c.setReportStatus);
+router.get('/stats', c.stats);
+router.get('/users', c.listUsers);
+router.get('/artworks/pending', c.pendingArtworks);
+router.get('/reports', c.listReports);
 
 module.exports = router;
+

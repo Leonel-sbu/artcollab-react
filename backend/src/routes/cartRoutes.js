@@ -1,9 +1,13 @@
 ﻿const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const c = require('../controllers/orderController');
 
-router.get('/', auth, c.getCart);
-router.put('/', auth, c.setCart);
-router.delete('/', auth, c.clearCart);
+// All cart endpoints require authentication
+router.use(protect);
+
+router.get('/', c.getCart);
+router.put('/', c.setCart);
+router.delete('/', c.clearCart);
 
 module.exports = router;
+

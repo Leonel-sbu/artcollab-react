@@ -1,13 +1,21 @@
-﻿import { api } from "./api";
+import api from "./api";
 
-export const authService = {
-  async login({ email, password }) {
-    return api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
-  },
-  async register({ name, email, password }) {
-    return api("/auth/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
-  },
-  async me() {
-    return api("/auth/me");
-  },
-};
+export async function register(payload) {
+    const { data } = await api.post("/api/auth/register", payload);
+    return data; // expects { success, token, user? }
+}
+
+export async function login(payload) {
+    const { data } = await api.post("/api/auth/login", payload);
+    return data;
+}
+
+export async function forgotPassword(payload) {
+    const { data } = await api.post("/api/auth/forgot-password", payload);
+    return data;
+}
+
+export async function resetPassword(payload) {
+    const { data } = await api.post("/api/auth/reset-password", payload);
+    return data;
+}

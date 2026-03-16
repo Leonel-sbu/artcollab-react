@@ -1,14 +1,67 @@
-﻿import { api } from "./api";
+﻿import api from "./api";
 
-export const artworkService = {
-  async list(params = {}) {
-    // backend: GET /artworks
-    // params example: { featured: true, available: true, limit: 4, sort: "-createdAt" }
-    const qs = new URLSearchParams(params).toString();
-    return api(`/artworks${qs ? `?${qs}` : ""}`);
-  },
+/**
+ * UPLOAD IMAGE
+ * POST /api/uploads/image
+ * 
+ * Returns the path like "/uploads/filename.jpg"
+ */
+export async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append('image', file);
 
-  async getById(id) {
-    return api(`/artworks/${id}`);
-  },
-};
+  // Use the api client which handles:
+  // - withCredentials for cookies
+  // - CSRF token in headers
+  const res = await api.post('/api/uploads/image', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+
+  if (!res.data?.success) {
+    throw new Error(res.data?.message || 'Image upload failed');
+  }
+
+  const path = res.data?.path;
+  if (!path || !path.startsWith('/uploads/')) {
+    throw new Error('Invalid upload path returned from server');
+  }
+
+  return path;
+}
+
+/**
+ * CREATE ARTWORK
+ * POST /api/artworks
+ *
+ * payload MUST contain:
+ * - title
+ * - price
+ * - imageUrl  👉 MUST be "/uploads/filename.jpg"
+ */
+export async function createArtwork(payload) {
+  if (!payload?.imageUrl) {
+    throw new Error("createArtwork called without imageUrl");
+  }
+
+  // Enforce correct format on frontend (last line of defense)
+  if (
+    !payload.imageUrl.startsWith("/uploads/") &&
+    !payload.imageUrl.startsWith("http")
+  ) {
+    throw new Error("Invalid imageUrl format");
+  }
+
+  const res = await api.post("/api/artworks", payload);
+  return res.data;
+}
+
+/**
+ * LIST ARTWORKS
+ * GET /api/artworks
+ */
+export async function listArtworks(params = {}) {
+  const res = await api.get("/api/artworks", { params });
+  return res.data;
+}

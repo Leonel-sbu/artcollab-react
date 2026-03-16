@@ -1,18 +1,8 @@
-﻿const jwt = require('jsonwebtoken');
+﻿// backend/src/middleware/authMiddleware.js
+// This file re-exports from protect.js to maintain backward compatibility
+// All routes should use middleware from this single source
 
-module.exports = function authMiddleware(req, res, next) {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+const { protect, getTokenFromHeader } = require('./protect');
+const { authorize } = require('./authorize');
 
-  if (!token) {
-    return res.status(401).json({ success: false, message: 'Not authorized' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, role }
-    next();
-  } catch (e) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
-};
+module.exports = { protect, authorize, getTokenFromHeader };
