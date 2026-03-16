@@ -28,7 +28,7 @@ const path = require("path");
 
 const notFound = require("./middleware/notFound");
 const errorHandler = require("./middleware/errorHandler");
-const { sanitizeBody } = require("./middleware/sanitizeInput");
+const { sanitizeBody, sanitizeObject } = require("./middleware/sanitizeInput");
 
 /* ------------------------------- ROUTES ---------------------------------- */
 const authRoutes = require("./routes/authRoutes");
@@ -82,8 +82,15 @@ app.use(express.urlencoded({ extended: true }));
 
 /* --------------------------- INPUT SANITIZATION --------------------------- */
 // Sanitize all request body inputs to prevent XSS
-// TEMPORARILY DISABLED - causing issues with JSON parsing
-// app.use(sanitizeBody);
+// Applied after express.json to avoid parsing issues
+
+// Sanitize body - skip if body is not a plain object (e.g., Stripe webhook raw body)
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    req.body = sanitizeObject(req.body);
+  }
+  next();
+});
 
 /* --------------------------- CSRF PROTECTION ------------------------------ */
 // Custom CSRF middleware with route exemptions
