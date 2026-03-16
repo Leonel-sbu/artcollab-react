@@ -1,36 +1,89 @@
-﻿const RAW_BASE =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+﻿import axios from "axios";
 
-function normalizeBase(raw) {
-  // If user sets http://localhost:5000/api we keep it.
-  // If user sets http://localhost:5000 we append /api.
-  const trimmed = String(raw).replace(/\/+$/, "");
-  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
-}
+// Get API base URL - must be set in production!
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
 
-const API_BASE = normalizeBase(RAW_BASE);
-
-export async function api(path, options = {}) {
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
-    },
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const msg =
-      data?.message ||
-      data?.error ||
-      `Request failed (${res.status})`;
-    throw new Error(msg);
+  if (!envUrl) {
+    // In production without VITE_API_BASE_URL, fail fast
+    if (import.meta.env.PROD) {
+      throw new Error('VITE_API_BASE_URL is required in production');
+    }
+    // Development fallback
+    console.warn('WARNING: VITE_API_BASE_URL not set, using localhost');
+    return 'http://localhost:5000';
   }
 
-  return data;
+  // Validate HTTPS in production
+  if (import.meta.env.PROD && !envUrl.startsWith('https://')) {
+    throw new Error('VITE_API_BASE_URL must use HTTPS in production');
+  }
+
+  return envUrl;
+};
+
+const api = axios.create({
+  baseURL: getApiBaseUrl(),
+  // CRITICAL: Enable credentials for cookie-based auth
+  withCredentials: true,
+});
+
+// CSRF token storage (in-memory for security - not localStorage)
+let csrfToken = null;
+
+// Fetch CSRF token from backend
+// Call this on app initialization after user logs in
+export async function fetchCsrfToken() {
+  try {
+    const res = await axios.get(
+      `${getApiBaseUrl()}/api/csrf-token`,
+      { withCredentials: true }
+    );
+    csrfToken = res.data.csrfToken;
+    return csrfToken;
+  } catch (error) {
+    console.error("Failed to fetch CSRF token:", error);
+    return null;
+  }
 }
+
+// Get current CSRF token
+export function getCsrfToken() {
+  return csrfToken;
+}
+
+// NOTE: Token-based auth (Authorization header) has been removed.
+// Auth is now handled via httpOnly cookies set by the backend on login/register.
+// The backend protect middleware reads from cookies automatically.
+// CSRF protection is enforced via X-CSRF-Token header for state-changing requests.
+
+// Request interceptor - adds CSRF token to state-changing requests
+api.interceptors.request.use(
+  (config) => {
+    // Add CSRF token for state-changing methods
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method?.toUpperCase())) {
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = csrfToken;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle 401 errors - redirect to login if needed
+    if (error.response?.status === 401) {
+      // Could dispatch a logout action here if needed
+      console.log("Auth error:", error.response?.data?.message);
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;

@@ -1,12 +1,13 @@
 ﻿const router = require('express').Router();
-const auth = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const c = require('../controllers/orderController');
 
-router.post('/checkout', auth, c.checkout);
-router.get('/mine', auth, c.myOrders);
-router.get('/:id', auth, c.getOrder);
+router.post('/checkout', protect, c.checkout);
+router.get('/mine', protect, c.myOrders);
+router.get('/:id', protect, c.getOrder);
 
 
 
 module.exports = router;
+
 

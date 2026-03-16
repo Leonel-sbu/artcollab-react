@@ -7,6 +7,10 @@ function calcSubtotal(items) {
 
 // CART
 exports.getCart = async (req, res) => {
+  // Return empty cart for unauthenticated users
+  if (!req.user) {
+    return res.json({ success: true, cart: { items: [] }, subtotal: 0 });
+  }
   const cart = (await Cart.findOne({ user: req.user.id })) || (await Cart.create({ user: req.user.id, items: [] }));
   res.json({ success: true, cart, subtotal: calcSubtotal(cart.items) });
 };
@@ -66,8 +70,4 @@ exports.getOrder = async (req, res) => {
   if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
   res.json({ success: true, order });
 };
-exports.getOrderById = async (req, res) => {
-  const order = await Order.findOne({ _id: req.params.id, user: req.user.id });
-  if (!order) return res.status(404).json({ success: false, message: "Order not found" });
-  res.json({ success: true, order });
-};
+

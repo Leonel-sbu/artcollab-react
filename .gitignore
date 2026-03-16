@@ -1,0 +1,52 @@
+# =============================================================================
+# ARTCOLLAB .GITIGNORE
+# =============================================================================
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Environment files (keep .env.production.example)
+.env
+.env.local
+.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/uploads/posts/*
+!backend/uploads/posts/.gitkeep
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.parcel-cache/

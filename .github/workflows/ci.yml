@@ -1,0 +1,151 @@
+# =============================================================================
+# ArtCollab CI/CD Workflow
+# =============================================================================
+# Runs on: push to main, pull requests
+# 
+# Jobs:
+#   1. Install dependencies for backend and frontend
+#   2. Run linting (if configured)
+#   3. Run tests
+#   4. Build frontend
+# =============================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend Tests
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+      
+      - name: Run backend tests
+        working-directory: backend
+        run: npm test
+        env:
+          # Use test database or mock for CI
+          MONGO_URI: mongodb://localhost:27017/artcollab_test
+          JWT_SECRET: test_jwt_secret_for_ci_with_minimum_32_chars
+          CLIENT_URL: http://localhost:5173
+          NODE_ENV: test
+
+  # ---------------------------------------------------------------------------
+  # Frontend Build
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:5000
+          NODE_ENV: production
+      
+      - name: Upload frontend build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Lint (optional - enable if you have ESLint configured)
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    if: false  # Set to true if you have lint scripts configured
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          cd backend && npm ci
+          cd ../frontend && npm ci
+      
+      - name: Run lint
+        run: |
+          cd backend && npm run lint || true
+          cd ../frontend && npm run lint || true
+
+  # ---------------------------------------------------------------------------
+  # Deploy (manual trigger only)
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    permissions:
+      contents: read
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/dist
+      
+      # Add your deployment steps here
+      # Examples:
+      # - Deploy to Vercel/Netlify
+      # - Deploy to AWS S3/CloudFront
+      # - Deploy via SSH to your server
+      - name: Deploy notification
+        run: |
+          echo "Deployment would happen here"
+          echo "Add deployment steps for your hosting provider"

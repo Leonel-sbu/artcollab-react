@@ -20,8 +20,30 @@ exports.stats = async (req, res) => {
 };
 
 exports.listUsers = async (req, res) => {
-  const items = await User.find().select('name email role createdAt').sort({ createdAt: -1 }).limit(500);
-  res.json({ success: true, items });
+  // Pagination: ?page=1&limit=20
+  const page = parseInt(req.query.page) || 1;
+  const limit = Math.min(parseInt(req.query.limit) || 20, 100); // Max 100 per page
+  const skip = (page - 1) * limit;
+
+  const [items, total] = await Promise.all([
+    User.find()
+      .select('name email role createdAt')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    User.countDocuments()
+  ]);
+
+  res.json({
+    success: true,
+    items,
+    pagination: {
+      totalUsers: total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      limit
+    }
+  });
 };
 
 exports.pendingArtworks = async (req, res) => {
@@ -69,4 +91,51 @@ exports.setReportStatus = async (req, res) => {
   await item.save();
 
   res.json({ success: true, item });
+};
+
+// ========== USER MANAGEMENT ==========
+
+exports.updateUserRole = async (req, res) => {
+  const { role } = req.body || {};
+  const validRoles = ['admin', 'artist', 'buyer', 'learner'];
+
+  if (!role || !validRoles.includes(role)) {
+    return res.status(400).json({ success: false, message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+  }
+
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  // Prevent self-demotion (admin cannot remove their own admin role)
+  if (req.user._id.toString() === user._id.toString() && user.role === 'admin' && role !== 'admin') {
+    return res.status(400).json({ success: false, message: 'Cannot remove your own admin role' });
+  }
+
+  const previousRole = user.role;
+  user.role = role;
+  await user.save();
+
+  res.json({
+    success: true,
+    message: `User role updated from '${previousRole}' to '${role}'`,
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role }
+  });
+};
+
+exports.deleteUser = async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'User not found' });
+  }
+
+  // Prevent self-deletion
+  if (req.user._id.toString() === user._id.toString()) {
+    return res.status(400).json({ success: false, message: 'Cannot delete your own account' });
+  }
+
+  await User.findByIdAndDelete(req.params.id);
+
+  res.json({ success: true, message: 'User deleted successfully' });
 };
