@@ -19,7 +19,7 @@ const orderSchema = new mongoose.Schema(
     subtotal: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'refund_pending', 'refunded'],
+      enum: ['pending', 'paid', 'payment_failed', 'refund_pending', 'refunded'],
       default: 'pending'
     },
     paymentProvider: { type: String, default: 'manual' },

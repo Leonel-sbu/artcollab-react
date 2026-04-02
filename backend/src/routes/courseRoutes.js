@@ -7,27 +7,29 @@ router.get('/', c.list);
 router.get('/categories', c.getCategories);
 router.get('/stats', c.getStats);
 
-// Protected routes - SPECIFIC routes first, then wildcard
-router.get('/my-courses', protect, c.myCourses);
+// Student routes
 router.get('/my-enrollments', protect, c.myEnrollments);
-router.get('/instructor/earnings', protect, c.getEarnings);
 router.get('/my-level', protect, c.getMyLevel);
 
-router.post('/', protect, c.create);
+// Admin-only: course authoring
+router.get('/my-courses', protect, authorize('admin'), c.myCourses);
+router.get('/instructor/earnings', protect, authorize('admin'), c.getEarnings);
+router.post('/', protect, authorize('admin'), c.create);
 
-// Enrollment routes
+// Enrollment routes (any authenticated user)
+router.post('/:id/checkout', protect, c.checkout);
 router.post('/:id/enroll', protect, c.enroll);
 router.get('/:id/progress', protect, c.getMyProgress);
 router.post('/:id/progress/complete', protect, c.completeLesson);
 
 // Assignment routes
 router.post('/:courseId/assignments', protect, c.submitAssignment);
-router.get('/:courseId/submissions', protect, c.getStudentSubmissions);
-router.patch('/:courseId/enrollments/:enrollmentId/grade', protect, c.gradeAssignment);
+router.get('/:courseId/submissions', protect, authorize('admin'), c.getStudentSubmissions);
+router.patch('/:courseId/enrollments/:enrollmentId/grade', protect, authorize('admin'), c.gradeAssignment);
 
 // Course CRUD - MUST come after specific routes
 router.get('/:id', c.getById);
-router.patch('/:id', protect, c.update);
-router.delete('/:id', protect, c.remove);
+router.patch('/:id', protect, authorize('admin'), c.update);
+router.delete('/:id', protect, authorize('admin'), c.remove);
 
 module.exports = router;

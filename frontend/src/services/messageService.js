@@ -1,6 +1,7 @@
 /**
  * Message Service
  * API calls for messaging functionality
+ * Uses AbortController for request cancellation and error handling
  */
 
 import api from "./api";
@@ -61,10 +62,27 @@ export async function deleteMessage(messageId) {
     return data;
 }
 
-// Unread count
-export async function getUnreadCount() {
-    const { data } = await api.get("/api/messages/unread-count");
-    return data;
+// Unread count - with AbortController support and proper response handling
+// Backend returns: { success: true, totalUnread: number }
+export async function getUnreadCount(abortSignal = null) {
+    try {
+        const config = abortSignal ? { signal: abortSignal } : {};
+        const { data } = await api.get("/api/messages/unread-count", config);
+
+        // Return proper response format like backend sends
+        if (data?.success) {
+            return { success: true, totalUnread: data.totalUnread || 0 };
+        }
+        // Handle direct number response or missing success
+        return { success: true, totalUnread: data?.count ?? data ?? 0 };
+    } catch (error) {
+        // Aborted requests are normal (cleanup), return 0 for other errors
+        if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+            return { success: true, totalUnread: 0 };
+        }
+        console.warn("Failed to get unread count:", error.message);
+        return { success: false, totalUnread: 0, message: error.message };
+    }
 }
 
 // Legacy endpoints (for backward compatibility)

@@ -1,5 +1,6 @@
 ﻿import { Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { motion, useInView } from "framer-motion";
 
 // ✅ Import images correctly
 import img1 from "../assets/images/images.jpg";
@@ -72,9 +73,9 @@ const Home = () => {
     }, [backgroundImages.length]);
 
     return (
-        <div className="min-h-screen bg-black">
+        <div className="bg-black">
             {/* ================= HERO ================= */}
-            <section className="relative min-h-screen overflow-hidden pt-20">
+            <section className="relative min-h-screen pt-20">
                 {/* Background Carousel */}
                 <div className="absolute inset-0">
                     {backgroundImages.map((item, index) => (
@@ -126,24 +127,67 @@ const Home = () => {
                         Experience, create, and trade art in immersive virtual galleries.
                         Join thousands of artists and collectors.
                     </p>
+
+                    {/* Premium Glassmorphism Scroll Indicator */}
+                    <div className="mt-16">
+                        <a
+                            href="#features"
+                            className="group relative inline-flex items-center justify-center"
+                        >
+                            {/* Pulse ring animation */}
+                            <span className="absolute inset-0 rounded-full bg-white/20 animate-pulse-ring" />
+
+                            {/* Glassmorphism button */}
+                            <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                                <svg
+                                    className="w-6 h-6 text-white/80 group-hover:translate-y-1 transition-transform duration-300"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                                    />
+                                </svg>
+                            </span>
+                        </a>
+                        <p className="mt-4 text-sm text-gray-400">Explore</p>
+                    </div>
                 </div>
             </section>
 
             {/* ================= FEATURES ================= */}
-            <section className="py-20 bg-black/90">
+            <section id="features" className="py-20 bg-black">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-4xl font-bold text-center text-white mb-12">
+                    <motion.h2
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.6 }}
+                        className="text-4xl font-bold text-center text-white mb-12"
+                    >
                         Why Choose{" "}
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
                             ArtCollab
                         </span>
                         ?
-                    </h2>
+                    </motion.h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                         {features.map((f, i) => (
-                            <div
+                            <motion.div
                                 key={i}
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                                transition={{
+                                    duration: 0.5,
+                                    delay: i * 0.15,
+                                    ease: "easeOut"
+                                }}
                                 className="bg-white/5 backdrop-blur p-6 rounded-2xl hover:scale-105 transition"
                             >
                                 <div
@@ -157,7 +201,7 @@ const Home = () => {
                                 </h3>
 
                                 <p className="text-gray-300">{f.description}</p>
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                 </div>

@@ -1,8 +1,9 @@
 ﻿const express = require("express");
 const router = express.Router();
 const { getStats } = require("../controllers/dashboardController");
+const { protect } = require("../middleware/protect");
 
-// Public dashboard stats - no authentication required
-router.get("/stats", getStats);
+// Protected dashboard stats - authentication required
+router.get("/stats", protect, getStats);
 
 module.exports = router;

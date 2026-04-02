@@ -1,9 +1,16 @@
 ﻿const User = require("../models/User");
 const Artwork = require("../models/Artwork");
 const Order = require("../models/Order");
+const Commission = require("../models/Commission");
+const Course = require("../models/Course");
 
 exports.getStats = async (req, res) => {
   try {
+    // DEBUG logging
+    console.log('=== Dashboard Stats Request ===');
+    console.log('User:', req.user ? req.user.email : 'none');
+    console.log('Role:', req.user?.role);
+
     // Return empty stats for unauthenticated users
     if (!req.user) {
       return res.json({
@@ -18,26 +25,57 @@ exports.getStats = async (req, res) => {
     }
 
     const userId = req.user._id;
+    const userRole = req.user.role;
+    console.log('Checking admin:', userRole === 'admin');
 
-    // Get user's artworks and orders
-    // FIX: Changed 'buyer' to 'user' to match Order model schema
-    const [artworks, orders] = await Promise.all([
-      Artwork.find({ artist: userId }),
-      Order.find({ user: userId }).populate('items.artwork', null, null, { strictPopulate: false })
+    // If admin, show global stats
+    if (userRole === 'admin') {
+      console.log('Admin detected - fetching global stats');
+      const [totalArtworks, totalOrders, totalCommissions, totalCourses] = await Promise.all([
+        Artwork.countDocuments({ status: 'published' }),
+        Order.countDocuments({ status: 'paid' }),
+        Commission.countDocuments({ booking: { $exists: true, $ne: null } }),
+        Course.countDocuments()
+      ]);
+
+      const totalRevenue = await Order.aggregate([
+        { $match: { status: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$subtotal' } } }
+      ]);
+
+      return res.json({
+        success: true,
+        data: {
+          totalArtworks,
+          totalSalesZAR: totalRevenue[0]?.total || 0,
+          totalOrders,
+          totalCommissions,
+          totalCourses,
+          followers: 0 // Admin doesn't have followers
+        }
+      });
+    }
+
+    // For regular users, show their personal stats + global published artworks
+    const [userArtworks, allPublishedArtworks, orders, user] = await Promise.all([
+      Artwork.find({ artist: userId, status: 'published' }),
+      Artwork.find({ status: 'published' }),
+      Order.find({ user: userId }).populate('items.artwork', null, null, { strictPopulate: false }),
+      User.findById(userId).select('followers')
     ]);
 
     // Calculate total sales (ZAR) from paid orders
     const paidOrders = orders.filter(o => o.status === 'paid');
     const totalSalesZAR = paidOrders.reduce((sum, order) => sum + (order.subtotal || 0), 0);
 
-    // Get user to check followers
-    const user = await User.findById(userId).select('followers');
     const followers = user?.followers?.length || 0;
 
     res.json({
       success: true,
       data: {
-        totalArtworks: artworks.length,
+        // Show BOTH user's artworks AND total published artworks
+        totalArtworks: userArtworks.length,
+        totalPublishedArtworks: allPublishedArtworks.length,
         totalSalesZAR,
         totalOrders: paidOrders.length,
         followers

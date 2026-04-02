@@ -1,239 +1,291 @@
-# ArtColLab Production Deployment Guide
+# ArtColLab Deployment Guide
 
-## Architecture Recommendation
-
-### Deployment Structure: Separate Frontend and Backend
-
-**Recommended approach:** Deploy frontend and backend as separate services:
-
-- **Backend:** Node.js/Express on a VPS (DigitalOcean, Linode, AWS EC2) or container platform (Railway, Render, Fly.io)
-- **Frontend:** Static hosting (Vercel, Netlify, or AWS S3 + CloudFront)
-- **Database:** MongoDB Atlas (managed service)
-
-**Why separate?**
-- Independent scaling
-- Better security (backend can be private)
-- Specialized hosting for each tier
-- Easier CI/CD pipeline
+**Version:** 1.0.0  
+**Last Updated:** March 29, 2026
 
 ---
 
-## Environment Variables Required
+## 1. Quick Start
 
-### Backend (`.env`)
-
+### Development
 ```bash
-# Server
+# Terminal 1 - Backend
+cd backend
+npm install
+node src/server.js
+
+# Terminal 2 - Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+### Production Build
+```bash
+# Backend
+cd backend
+npm install
+pm2 start ecosystem.config.js --env production
+
+# Frontend
+cd frontend
+npm install
+npm run build
+npm run preview
+```
+
+---
+
+## 2. Environment Configuration
+
+### Backend (.env)
+```env
 PORT=5000
 NODE_ENV=production
-
-# Database - MongoDB Atlas
-MONGO_URI=mongodb+srv://<username>:<password>@cluster<number>.xxx.mongodb.net/artcollab?appName=Cluster0&retryWrites=true&w=majority
-
-# JWT - Generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-JWT_SECRET=<64-character-random-string>
-
-# Frontend URL (HTTPS required in production)
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/artcollab?retryWrites=true&w=majority
+JWT_SECRET=your-jwt-secret-key
 CLIENT_URL=https://your-domain.com
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Email (optional)
-SENDGRID_API_KEY=SG....
-SENDGRID_FROM_EMAIL=noreply@yourdomain.com
+# SendGrid
+SMTP_HOST=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USER=apikey
+SMTP_PASS=SG....
+SMTP_FROM=your-email@gmail.com
 ```
 
-### Frontend (`.env.production`)
+### Frontend (.env.production)
+```env
+VITE_API_URL=https://api.your-domain.com
+```
 
+---
+
+## 3. Deployment Options
+
+### Option A: Manual Server (VPS)
+
+#### Backend
 ```bash
-VITE_API_BASE_URL=https://api.your-domain.com
-VITE_STRIPE_PUBLIC_KEY=pk_live_...
+# Install Node.js 20+
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Clone and setup
+git clone https://github.com/your-repo/artcollab-app.git
+cd artcollab-app/backend
+npm install --production
+
+# Create logs directory
+mkdir logs
+
+# Start with PM2
+pm2 start ecosystem.config.js --env production
+pm2 save
+pm2 startup
+```
+
+#### Frontend
+```bash
+cd artcollab-app/frontend
+npm install
+npm run build
+
+# Serve with nginx
+# Or: npm install -g serve
+# serve -s dist -l 5173
+```
+
+#### Nginx Config
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        root /var/www/artcollab/frontend/dist;
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location /uploads {
+        proxy_pass http://localhost:5000;
+    }
+}
 ```
 
 ---
 
-## Production Domains/Origins
+### Option B: Docker
 
-### Required CORS Configuration
-
-In your backend `.env`:
+#### Backend Image Build & Run
+```bash
+cd backend
+docker build -t artcollab-backend .
+docker run -d --name artcollab-backend -p 5000:5000 --env-file .env artcollab-backend
 ```
-CLIENT_URL=https://your-domain.com
-```
 
-**Cookie Settings:**
-- `secure: true` (HTTPS only)
-- `sameSite: 'strict'` (CSRF protection)
-- `httpOnly: true` (XSS protection for JWT)
-
-### Recommended Domain Structure
-
-```
-Frontend:  https://your-domain.com        (Vercel/Netlify/S3)
-API:       https://api.your-domain.com   (VPS/Container)
-Database:  MongoDB Atlas (managed)
+#### Frontend Build & Run
+```bash
+cd frontend
+docker build -t artcollab-frontend .
+docker run -d --name artcollab-frontend -p 5173:5173 artcollab-frontend
 ```
 
 ---
 
-## Files Changed/Added
+### Option C: PM2 with Cloud Provider
 
-### Environment Validation
-- **`backend/src/utils/env.js`** - Enhanced production validation
-  - Validates JWT_SECRET length (32+ chars)
-  - Validates HTTPS for CLIENT_URL
-  - Validates MongoDB URI format
-  - Validates Stripe keys for production
-  - Blocks localhost in production
-
-### Backend Production
-- **`backend/src/server.js`** - Production startup improvements
-  - Environment validation on startup
-  - Production-safe logging
-  - Graceful shutdown handling
-
-### Frontend Production
-- **`frontend/src/services/api.js`** - Production-safe API configuration
-  - Validates VITE_API_BASE_URL in production
-  - Blocks localhost fallback in production
-  - Validates HTTPS requirement
-
-### Docker/Process Management
-- **`backend/Dockerfile`** - Multi-stage production build
-- **`backend/.dockerignore`** - Excludes dev files from image
-- **`backend/ecosystem.config.js`** - PM2 process management
-
-### CI/CD
-- **`.github/workflows/ci.yml`** - GitHub Actions workflow
-  - Backend tests
-  - Frontend build
-  - Artifact upload
+#### Required Environment Variables
+| Variable | Production Value |
+|-----------|-----------------|
+| NODE_ENV | production |
+| PORT | 5000 |
+| MONGO_URI | Atlas connection string |
+| JWT_SECRET | Generated secure key |
+| CLIENT_URL | https://your-domain.com |
+| STRIPE_SECRET_KEY | sk_live_... |
+| STRIPE_WEBHOOK_SECRET | whsec_... |
 
 ---
 
-## Deployment Checklist
+## 4. MongoDB Atlas Setup
 
-### Pre-Deployment
+### Connection String Format
+```
+mongodb+srv://<username>:<password>@<cluster>.mongodb.net/artcollab?retryWrites=true&w=majority
+```
 
-- [ ] **Generate JWT_SECRET**
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-  ```
-
-- [ ] **Create MongoDB Atlas Cluster**
-  - Use M0 free tier for testing
-  - Configure network access (allow your server IP)
-  - Get connection string
-
-- [ ] **Configure Stripe**
-  - Get live API keys
-  - Create webhook endpoint: `https://api.your-domain.com/api/payments/webhook`
-  - Get webhook signing secret
-
-- [ ] **Configure Email (optional)**
-  - Sign up for SendGrid
-  - Verify sender email
-
-- [ ] **Domain Setup**
-  - Register domain
-  - Configure DNS for frontend (A record or CNAME)
-  - Configure DNS for API (CNAME to backend)
-
-### Backend Deployment
-
-- [ ] Set environment variables on hosting platform
-- [ ] Test with: `NODE_ENV=production node src/server.js`
-- [ ] Verify health endpoint: `https://api.your-domain.com/api/health`
-- [ ] Test Stripe webhook endpoint
-
-### Frontend Deployment
-
-- [ ] Build: `cd frontend && npm run build`
-- [ ] Deploy dist folder to hosting
-- [ ] Test login/logout flow
-- [ ] Test payment flow (use Stripe test cards)
-- [ ] Verify CSRF works (check browser console for errors)
-
-### Post-Deployment Verification
-
-- [ ] **Security**
-  - [ ] JWT tokens are httpOnly cookies
-  - [ ] CSRF protection working (check network tab)
-  - [ ] CORS properly configured
-  - [ ] No sensitive data in frontend code
-
-- [ ] **Functionality**
-  - [ ] User registration/login works
-  - [ ] Artwork upload works
-  - [ ] Payments process correctly
-  - [ ] Password reset emails send (if configured)
-  - [ ] Admin dashboard accessible
-
-- [ ] **Monitoring**
-  - [ ] Set up error logging (e.g., Sentry)
-  - [ ] Set up uptime monitoring
-  - [ ] Configure backup for MongoDB
+### Atlas Configuration
+1. **Create Cluster:** AWS/Firebase/GCP (choose region close to users)
+2. **Database User:** Create user with readWrite access to artcollab database
+3. **Network Access:** Add IP whitelist
+   - For development: 0.0.0.0/0
+   - For production: Server IP only
+4. **Index:** Ensure indexes on commonly queried fields
 
 ---
 
-## Quick Start Commands
+## 5. Stripe Configuration
 
-### Local Production Test
+### Live Keys
+1. Get keys from https://dashboard.stripe.com/apikeys
+2. Set `STRIPE_SECRET_KEY` to live secret key
+3. Configure webhook at https://dashboard.stripe.com/webhooks
+
+### Webhook Endpoint
+```
+https://your-domain.com/api/payments/webhook
+```
+
+### CLI for Testing
+```bash
+stripe listen --forward-to localhost:5000/api/payments/webhook
+```
+
+---
+
+## 6. Health Checks
+
+### Backend Health
+```bash
+curl https://api.your-domain.com/api/health
+# Response: {"success":true,"status":"ok","database":"connected"}
+```
+
+### Frontend
+- Serve static files or use CDN
+- Verify all routes work
+
+---
+
+## 7. Security Checklist
+
+- [ ] MongoDB Atlas IP whitelist configured
+- [ ] JWT_SECRET is unique and secure (64+ chars)
+- [ ] STRIPE_SECRET_KEY is live key for production
+- [ ] CORS configured for production domain
+- [ ] HTTPS enabled (SSL/TLS certificate)
+- [ ] Rate limiting enabled
+- [ ] CSRF protection enabled
+- [ ] XSS protection enabled (Helmet)
+- [ ] Admin accounts created via seed script (not registration)
+
+---
+
+## 8. Logging & Monitoring
+
+### PM2 Commands
+```bash
+pm2 logs artcollab-backend
+pm2 monit
+pm2 status
+```
+
+### Log Files
+- Backend: `logs/pm2-out.log`, `logs/pm2-error.log`
+
+---
+
+## 9. Troubleshooting
+
+### Common Issues
+
+**MongoDB Connection Timeout**
+- Check IP whitelist in Atlas
+- Verify connection string format
+
+**Stripe Webhooks Not Working**
+- Ensure webhook URL is publicly accessible
+- Check webhook secret matches
+
+**CORS Errors**
+- Verify CLIENT_URL in .env
+- Check allowed origins in app.js
+
+---
+
+## 10. Deployment Commands Summary
+
 ```bash
 # Backend
 cd backend
-cp .env.production.example .env
-# Edit .env with production-like values
-NODE_ENV=production npm start
-
-# Frontend (separate terminal)
-cd frontend
-cp .env.production.example .env
-# Edit .env with API URL
-npm run build
-npx serve dist
-```
-
-### Docker Deployment
-```bash
-# Build
-cd backend
-docker build -t artcollab-backend .
-
-# Run
-docker run -p 5000:5000 --env-file .env artcollab-backend
-```
-
-### PM2 Deployment (VPS)
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start
-cd backend
+npm install --production
 pm2 start ecosystem.config.js --env production
-
-# Setup startup script
-pm2 startup
 pm2 save
+
+# Frontend  
+cd frontend
+npm install
+npm run build
+
+# Verify
+curl http://localhost:5000/api/health
+curl http://localhost:5173
 ```
 
 ---
 
-## Final Blockers to Address Before Production
+## 11. Tech Stack Summary
 
-1. **Stripe Webhook** - Must be reachable from Stripe's servers
-2. **Email Deliverability** - Configure SPF/DKIM for SendGrid
-3. **HTTPS** - Ensure SSL certificates are valid
-4. **Domain DNS** - Point to correct hosting providers
-
----
-
-## Support
-
-For issues, check:
-- Backend logs: `pm2 logs` or Docker logs
-- Stripe Dashboard for payment issues
-- MongoDB Atlas logs for database issues
+| Component | Technology |
+|-----------|------------|
+| Frontend | React 18, Vite 7, Tailwind CSS |
+| Backend | Node.js, Express 4 |
+| Database | MongoDB Atlas (Mongoose 8) |
+| Auth | JWT, bcryptjs |
+| Payments | Stripe |
+| Email | SendGrid |
+| Deployment | PM2, Docker, Nginx |

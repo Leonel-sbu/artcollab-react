@@ -1,9 +1,9 @@
 ﻿// src/pages/UploadArtwork.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Upload, Tag, X } from "lucide-react";
+import { Upload } from "lucide-react";
 import toast from "react-hot-toast";
-import { createArtwork, uploadImage } from "../services/artworkService";
+import { createArtwork, uploadImage, getCategoryStats } from "../services/artworkService";
 import { useAuth } from "../context/AuthContext";
 
 const categories = [
@@ -21,9 +21,30 @@ export default function UploadArtwork() {
   const [step, setStep] = useState(1);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [categoryStats, setCategoryStats] = useState({});
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
+
+  useEffect(() => {
+    setStatsLoading(true);
+    setStatsError(false);
+    getCategoryStats()
+      .then(res => {
+        if (res?.success) {
+          setCategoryStats(res.stats || {});
+        } else {
+          setStatsError(true);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to load category stats:", err);
+        setStatsError(true);
+      })
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   // Get auth state from context - if not logged in, show message
-  const { user, isAuthed } = useAuth();
+  useAuth();
 
   const [formData, setFormData] = useState({
     title: "",
@@ -34,6 +55,8 @@ export default function UploadArtwork() {
     royalty: "10",
     licenseType: "personal",
     isExclusive: false,
+    editionTotal: "1",
+    editionNumber: "1",
     file: null,
     imageUrl: "",
     status: "published",
@@ -46,9 +69,6 @@ export default function UploadArtwork() {
 
   const textareaWhite =
     "w-full bg-white text-black placeholder:text-gray-500 border border-gray-300 rounded-lg px-4 py-3 h-32 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500";
-
-  const tagInputWhite =
-    "flex-1 bg-white text-black placeholder:text-gray-500 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500";
 
   /* ---------------------------------- helpers ---------------------------------- */
 
@@ -66,16 +86,6 @@ export default function UploadArtwork() {
 
     setFormData((p) => ({ ...p, file }));
     setPreview(URL.createObjectURL(file));
-  };
-
-  const addTag = (tag) => {
-    const t = String(tag || "").trim().toLowerCase();
-    if (!t || formData.tags.includes(t) || formData.tags.length >= 10) return;
-    setFormData((p) => ({ ...p, tags: [...p.tags, t] }));
-  };
-
-  const removeTag = (tag) => {
-    setFormData((p) => ({ ...p, tags: p.tags.filter((x) => x !== tag) }));
   };
 
   /* ------------------------- upload image (cookie-based) ------------------------- */
@@ -121,6 +131,9 @@ export default function UploadArtwork() {
         return toast.error("Please upload an image or provide a valid image URL");
       }
 
+      const editionTotal = Math.max(1, parseInt(formData.editionTotal) || 1);
+      const editionNumber = Math.min(editionTotal, Math.max(1, parseInt(formData.editionNumber) || 1));
+
       const payload = {
         title: formData.title.trim(),
         description: (formData.description || "").trim(),
@@ -132,6 +145,8 @@ export default function UploadArtwork() {
         royalty: Number(formData.royalty || 10),
         licenseType: formData.licenseType || "personal",
         isExclusive: Boolean(formData.isExclusive),
+        editionTotal,
+        editionNumber,
         status: "pending",
       };
 
@@ -177,7 +192,10 @@ export default function UploadArtwork() {
 
               <div
                 className="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer hover:border-purple-500"
-                onClick={() => document.getElementById("file-upload").click()}
+                onClick={() => {
+                  const input = document.getElementById("file-upload");
+                  if (input) input.click();
+                }}
               >
                 <input
                   id="file-upload"
@@ -231,10 +249,29 @@ export default function UploadArtwork() {
                   <option value="">Select category</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>
-                      {c}
+                      {c} {categoryStats[c] ? `(${categoryStats[c]} available)` : ''}
                     </option>
                   ))}
                 </select>
+
+                {formData.category && (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    {statsLoading ? (
+                      <span className="text-gray-400 px-1">Loading category info…</span>
+                    ) : statsError ? (
+                      <span className="text-yellow-400/70 px-1">Could not load category stats</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 bg-purple-600/20 border border-purple-500/40 text-purple-300 px-3 py-1.5 rounded-full">
+                        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9 12h6m-6-4h6M7 8h.01M7 12h.01M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z" />
+                        </svg>
+                        {categoryStats[formData.category]
+                          ? `${categoryStats[formData.category]} artwork${categoryStats[formData.category] !== 1 ? 's' : ''} currently in ${formData.category}`
+                          : `No artworks yet in ${formData.category} — be the first!`}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button type="button" onClick={() => setStep(3)} className="btn-primary mt-6">

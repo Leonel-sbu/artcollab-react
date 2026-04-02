@@ -8,7 +8,11 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
 
     // roles: admin | artist | buyer | learner
-    role: { type: String, enum: ['admin', 'artist', 'buyer', 'learner'], default: 'buyer' }
+    role: { type: String, enum: ['admin', 'artist', 'buyer', 'learner'], default: 'buyer' },
+
+    // Password reset fields
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false }
   },
   { timestamps: true }
 );

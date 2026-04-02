@@ -1,7 +1,8 @@
 // src/components/courses/CourseCard.jsx
 import { Clock, Users, Play, BookOpen } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// Use empty string for development (uses Vite proxy)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 function resolveImageUrl(raw) {
     const u = String(raw || "").trim();
@@ -12,17 +13,16 @@ function resolveImageUrl(raw) {
     return "";
 }
 
-export default function CourseCard({ course, onEnroll, onView }) {
+export default function CourseCard({ course, onEnroll, onView, onContinue, enrolled = false, progress = 0 }) {
     const {
         title,
         description,
         instructor,
-        thumbnail,
-        price,
-        duration,
+        thumbnailUrl,
+        pricing,
         lessons = [],
-        enrolledCount = 0,
-        level = "Beginner",
+        enrollmentCount = 0,
+        difficulty = "beginner",
         category
     } = course || {};
 
@@ -30,13 +30,13 @@ export default function CourseCard({ course, onEnroll, onView }) {
     const instructorName = instructor?.name || "Unknown Instructor";
     const instructorAvatar = instructor?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(instructorName)}`;
 
-    const imageUrl = resolveImageUrl(thumbnail);
+    const imageUrl = resolveImageUrl(thumbnailUrl);
     const fallbackImg = "https://picsum.photos/seed/course/800/450";
     const displayImg = imageUrl || fallbackImg;
 
     const lessonCount = Array.isArray(lessons) ? lessons.length : 0;
     const totalDuration = Array.isArray(lessons)
-        ? lessons.reduce((acc, l) => acc + (l.duration || 0), 0)
+        ? Math.round(lessons.reduce((acc, l) => acc + (l.durationSec || 0), 0) / 60)
         : 0;
 
     const formatDuration = (minutes) => {
@@ -77,11 +77,11 @@ export default function CourseCard({ course, onEnroll, onView }) {
 
                 {/* Level Badge */}
                 <div className="absolute top-3 right-3">
-                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${level === "Beginner" ? "bg-green-500/80" :
-                            level === "Intermediate" ? "bg-yellow-500/80" :
-                                "bg-red-500/80"
+                    <span className={`px-3 py-1 text-xs font-semibold rounded-full ${difficulty === "beginner" ? "bg-green-500/80" :
+                        difficulty === "intermediate" ? "bg-yellow-500/80" :
+                            "bg-red-500/80"
                         } text-white`}>
-                        {level}
+                        {difficulty?.charAt(0).toUpperCase() + difficulty?.slice(1) || "All"}
                     </span>
                 </div>
             </div>
@@ -115,25 +115,53 @@ export default function CourseCard({ course, onEnroll, onView }) {
                     </div>
                     <div className="flex items-center gap-1">
                         <Users className="w-4 h-4" />
-                        <span>{enrolledCount}</span>
+                        <span>{enrollmentCount}</span>
                     </div>
                 </div>
 
                 {/* Price & Enroll */}
                 <div className="flex justify-between items-center pt-4 border-t border-gray-800">
                     <div className="text-xl font-bold text-white">
-                        {price === 0 ? "Free" : `R ${price?.toLocaleString()}`}
+                        {!pricing?.oneTime?.price || pricing.oneTime.price === 0 ? "Free" : `R ${pricing.oneTime.price?.toLocaleString()}`}
                     </div>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onEnroll?.();
-                        }}
-                        className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium hover:opacity-90 transition"
-                    >
-                        {price === 0 ? "Start Learning" : "Enroll Now"}
-                    </button>
+                    {enrolled ? (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onContinue?.();
+                            }}
+                            className="px-4 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition"
+                        >
+                            {progress > 0 ? "Continue" : "Start Learning"}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onEnroll?.();
+                            }}
+                            className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium hover:opacity-90 transition"
+                        >
+                            {!pricing?.oneTime?.price || pricing.oneTime.price === 0 ? "Start Learning" : "Enroll Now"}
+                        </button>
+                    )}
                 </div>
+
+                {/* Progress Bar (only for enrolled courses) */}
+                {enrolled && progress > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-800">
+                        <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-400">Progress</span>
+                            <span className="text-blue-400 font-medium">{progress}%</span>
+                        </div>
+                        <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

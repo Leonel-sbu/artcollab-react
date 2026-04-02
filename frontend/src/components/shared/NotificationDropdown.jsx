@@ -37,6 +37,7 @@ const NotificationDropdown = () => {
             }
         } catch (err) {
             console.error("Failed to load notifications:", err);
+            // Silent fail for notifications - don't show error toast
         } finally {
             setLoading(false);
         }

@@ -1,13 +1,16 @@
 ﻿import { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Filter, Search, TrendingUp, Clock } from "lucide-react";
 import ArtworkCard from "../components/marketplace/ArtworkCard";
+import InlineLoader from "../components/shared/InlineLoader";
 import { getPublishedArtworks } from "../services/marketplaceService";
 import { cartService, formatZAR } from "../services/cartService";
 import { useAuth } from "../context/AuthContext";
 
 // If your API base is different, change it here.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// Use empty string for development (uses Vite proxy)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 function normalizeCategory(v) {
   const c = String(v || "").trim();
@@ -27,6 +30,7 @@ function resolveImageUrl(raw) {
 }
 
 export default function Marketplace() {
+  const navigate = useNavigate();
   const [artworks, setArtworks] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
@@ -45,8 +49,16 @@ export default function Marketplace() {
         if (!res?.success) throw new Error(res?.message || "Failed to load artworks");
         setArtworks(Array.isArray(res.items) ? res.items : []);
       } catch (e) {
-        console.error(e);
-        toast.error(e?.message || "Failed to load artworks");
+        console.error('Marketplace load error:', e);
+        if (e.code === 'ERR_NETWORK' || e.message === 'Network Error') {
+          toast.error("Unable to connect to server. Please check your connection.");
+        } else if (e.response?.status === 401) {
+          toast.error("Please log in to view artworks.");
+        } else if (e.response?.status === 403) {
+          toast.error("Access denied.");
+        } else {
+          toast.error(e?.message || "Failed to load artworks");
+        }
         setArtworks([]);
       } finally {
         setLoading(false);
@@ -113,7 +125,6 @@ export default function Marketplace() {
         artistAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`,
         price: `R ${Number(a?.price || 0).toLocaleString("en-ZA")}`,
         category: normalizeCategory(a?.category),
-        // IMPORTANT: only fallback if imageUrl missing/invalid
         imageUrl: img || "https://picsum.photos/seed/artcollab/900/600",
         likes: Number(a?.likes || 0),
         views: Number(a?.views || 0),
@@ -123,11 +134,11 @@ export default function Marketplace() {
   }, [filteredArtworks]);
 
   // ========
-  // Reaction handlers (UI-only for now)
+  // Reaction handlers
   // ========
   const handleView = useCallback((id) => {
-    toast(`View artwork: ${id}`);
-  }, []);
+    navigate(`/artwork/${id}`);
+  }, [navigate]);
 
   const handleBuy = useCallback(async (id) => {
     const artwork = artworks.find(a => a._id === id);
@@ -139,7 +150,6 @@ export default function Marketplace() {
     }
 
     try {
-      // Extract price - convert to number if needed
       const price = typeof artwork.price === 'string'
         ? parseFloat(artwork.price.replace(/[^0-9.-]+/g, ''))
         : artwork.price || 0;
@@ -192,8 +202,8 @@ export default function Marketplace() {
                 type="button"
                 onClick={() => setSelectedCategory(category)}
                 className={`px-4 py-2 rounded-full transition-all duration-300 ${selectedCategory === category
-                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                  ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
                   }`}
               >
                 {category}
@@ -241,9 +251,7 @@ export default function Marketplace() {
 
         {/* Body */}
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
-          </div>
+          <InlineLoader />
         ) : (
           <>
             {/* Results */}

@@ -44,7 +44,17 @@ export default function Dashboard() {
 
       setStats(res.data || {});
     } catch (e) {
-      setError(e?.message || "Failed to load dashboard.");
+      console.error('Dashboard load error:', e);
+      // Provide more specific error messages based on error type
+      if (e.code === 'ERR_NETWORK' || e.message === 'Network Error') {
+        setError("Unable to connect to server. Please check your connection.");
+      } else if (e.response?.status === 401) {
+        setError("Please log in to view your dashboard.");
+      } else if (e.response?.status === 403) {
+        setError("Access denied.");
+      } else {
+        setError(e?.message || "Failed to load dashboard.");
+      }
     } finally {
       setLoading(false);
     }
@@ -120,7 +130,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="relative flex-1 overflow-hidden">
+    <div className="relative flex-1 overflow-y-auto">
       {/* Background */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"

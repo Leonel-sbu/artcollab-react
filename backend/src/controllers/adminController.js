@@ -1,8 +1,9 @@
-﻿const User = require('../models/User');
-const Artwork = require('../models/Artwork');
-const Course = require('../models/Course');
-const Order = require('../models/Order');
-const Report = require('../models/Report');
+﻿const User       = require('../models/User');
+const Artwork    = require('../models/Artwork');
+const Course     = require('../models/Course');
+const Order      = require('../models/Order');
+const Report     = require('../models/Report');
+const Enrollment = require('../models/Enrollment');
 
 exports.stats = async (req, res) => {
   const [users, artworks, courses, orders, openReports] = await Promise.all([
@@ -138,4 +139,107 @@ exports.deleteUser = async (req, res) => {
   await User.findByIdAndDelete(req.params.id);
 
   res.json({ success: true, message: 'User deleted successfully' });
+};
+
+// ========== COURSE MANAGEMENT ==========
+
+exports.listAllCourses = async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+
+  const [items, total] = await Promise.all([
+    Course.find(filter)
+      .populate('instructor', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Course.countDocuments(filter),
+  ]);
+
+  res.json({
+    success: true,
+    items,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
+};
+
+exports.setCourseStatus = async (req, res) => {
+  const { status } = req.body || {};
+  if (!['draft', 'published', 'archived'].includes(status)) {
+    return res.status(400).json({ success: false, message: 'Invalid status' });
+  }
+
+  const item = await Course.findById(req.params.id);
+  if (!item) return res.status(404).json({ success: false, message: 'Course not found' });
+
+  item.status = status;
+  await item.save();
+
+  res.json({ success: true, item });
+};
+
+// ========== ORDER MANAGEMENT ==========
+
+exports.listAllOrders = async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+
+  const [items, total] = await Promise.all([
+    Order.find(filter)
+      .populate('user', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Order.countDocuments(filter),
+  ]);
+
+  res.json({
+    success: true,
+    items,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
+};
+
+// ========== ENROLLMENT / STUDENT MANAGEMENT ==========
+
+exports.listEnrollments = async (req, res) => {
+  const page  = Math.max(1, parseInt(req.query.page)  || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip  = (page - 1) * limit;
+
+  const filter = {};
+  if (req.query.courseId) filter.course = req.query.courseId;
+  if (req.query.userId)   filter.user   = req.query.userId;
+
+  const [items, total] = await Promise.all([
+    Enrollment.find(filter)
+      .populate('user',   'name email')
+      .populate('course', 'title category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Enrollment.countDocuments(filter),
+  ]);
+
+  res.json({
+    success: true,
+    items,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
+};
+
+exports.removeEnrollment = async (req, res) => {
+  const item = await Enrollment.findById(req.params.id);
+  if (!item) return res.status(404).json({ success: false, message: 'Enrollment not found' });
+
+  await Enrollment.findByIdAndDelete(req.params.id);
+  res.json({ success: true, message: 'Enrollment removed' });
 };

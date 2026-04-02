@@ -1,5 +1,6 @@
 ﻿const Commission = require("../models/Commission");
 const Notification = require("../models/Notification");
+const Conversation = require("../models/Conversation");
 
 /* ----------------------------- LIST COMMISSIONS ----------------------------- */
 // Public: list all commission services with filters
@@ -208,10 +209,17 @@ exports.book = async (req, res) => {
       message: `New commission request: ${title}`,
     });
 
+    // Create or find conversation between buyer and artist
+    const conversation = await Conversation.findOrCreate(
+      [req.user.id, artistId],
+      'commission',
+      { resourceType: 'commission', resourceId: commission._id }
+    );
+
     await commission.populate("artist", "name email");
     await commission.populate("buyer", "name email");
 
-    res.json({ success: true, item: commission });
+    res.json({ success: true, item: commission, conversationId: conversation._id });
   } catch (err) {
     console.error("Book commission error:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -357,4 +365,29 @@ exports.getCategories = async (req, res) => {
   ];
 
   res.json({ success: true, categories });
+};
+
+/* ----------------------------- GET STATS ------------------------- */
+exports.getStats = async (req, res) => {
+  try {
+    const Commission = require('../models/Commission');
+
+    const totalServices = await Commission.countDocuments({ status: 'published' });
+    const totalBookings = await Commission.countDocuments({ booking: { $exists: true, $ne: null } });
+    const totalRevenue = await Commission.aggregate([
+      { $match: { paymentStatus: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$price' } } }
+    ]);
+
+    res.json({
+      success: true, stats: {
+        totalServices,
+        totalBookings,
+        totalRevenue: totalRevenue[0]?.total || 0
+      }
+    });
+  } catch (err) {
+    console.error('Get stats error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };

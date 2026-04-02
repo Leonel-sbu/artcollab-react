@@ -1,10 +1,14 @@
 ﻿import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { register } = useAuth();
+
+  // Get the redirect destination from location state, default to /dashboard
+  const from = location.state?.from?.pathname || "/dashboard";
 
   const [formData, setFormData] = useState({
     name: "",
@@ -49,24 +53,26 @@ export default function Register() {
       if (password !== formData.confirmPassword) throw new Error("Passwords do not match!");
       if (!formData.terms) throw new Error("You must accept the Terms of Service and Privacy Policy.");
 
+      const roleMap = {
+        artist: "artist",
+        collector: "buyer",
+        learner: "learner",
+      };
+
       const payload = {
         name,
         email,
         password,
-        // role: formData.userType, // enable ONLY if your backend accepts `role`
+        role: roleMap[formData.userType] || "buyer",
       };
 
       const result = await register(payload);
 
       if (!result?.success) {
-        // support different backend error shapes
         throw new Error(result?.message || result?.error || "Registration failed. Please try again.");
       }
 
-      // With cookie-based auth, register() already validates cookie via refreshAuth()
-      // No need to check localStorage - the cookie is set automatically
-
-      navigate("/dashboard", { replace: true });
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err?.message || "An unexpected error occurred.");
       console.error("Registration error:", err);
@@ -104,7 +110,6 @@ export default function Register() {
           )}
 
           <form className="space-y-8" onSubmit={handleSubmit}>
-            {/* User Type */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-4">I am joining as a...</label>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -126,7 +131,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Full Name</label>
@@ -176,12 +180,22 @@ export default function Register() {
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        />
                       </svg>
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
                       </svg>
                     )}
                   </button>
@@ -197,7 +211,11 @@ export default function Register() {
                     type={showConfirmPassword ? "text" : "password"}
                     required
                     autoComplete="new-password"
-                    className={`w-full px-4 py-3 bg-gray-800 border rounded-xl placeholder-gray-500 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent pr-12 ${passwordsMatch === false ? "border-red-500" : passwordsMatch === true ? "border-green-500" : "border-gray-700"
+                    className={`w-full px-4 py-3 bg-gray-800 border rounded-xl placeholder-gray-500 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent pr-12 ${passwordsMatch === false
+                      ? "border-red-500"
+                      : passwordsMatch === true
+                        ? "border-green-500"
+                        : "border-gray-700"
                       }`}
                     value={formData.confirmPassword}
                     onChange={handleChange}
@@ -210,12 +228,22 @@ export default function Register() {
                   >
                     {showConfirmPassword ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        />
                       </svg>
                     ) : (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
                       </svg>
                     )}
                   </button>
@@ -239,7 +267,11 @@ export default function Register() {
               </label>
             </div>
 
-            <button type="submit" disabled={submitting} className="w-full btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full btn-primary py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {submitting ? "Creating Account..." : `Create ${formData.userType} Account`}
             </button>
           </form>

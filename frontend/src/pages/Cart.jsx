@@ -36,7 +36,13 @@ export default function Cart() {
             }
         } catch (error) {
             console.error('Failed to load cart:', error);
-            toast.error('Failed to load cart');
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            } else if (error.response?.status === 401) {
+                toast.error("Please log in to view your cart.");
+            } else {
+                toast.error('Failed to load cart');
+            }
         } finally {
             setLoading(false);
         }

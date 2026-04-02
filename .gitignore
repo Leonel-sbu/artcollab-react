@@ -4,15 +4,25 @@
 
 # Dependencies
 node_modules/
+backend/backend/node_modules/
 frontend/node_modules/
+*/node_modules/
+package-lock.json
+backend/package-lock.json
+frontend/package-lock.json
+*/node_modules/
 
 # Environment files (keep .env.production.example)
 .env
 .env.local
 .env.*.local
+.env.production
 frontend/.env
 frontend/.env.local
 frontend/.env.*.local
+backend/.env
+backend/.env.local
+backend/.env.*.local
 
 # Uploads
 backend/uploads/*

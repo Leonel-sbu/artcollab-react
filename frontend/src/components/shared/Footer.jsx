@@ -32,9 +32,9 @@
                     <div>
                         <h3 className="text-lg font-semibold text-white mb-6">Resources</h3>
                         <ul className="space-y-3">
-                            <li><a href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</a></li>
-                            <li><a href="/tutorials" className="text-gray-400 hover:text-white transition-colors">Tutorials</a></li>
-                            <li><a href="/support" className="text-gray-400 hover:text-white transition-colors">Support</a></li>
+                            <li className="text-gray-400">Blog</li>
+                            <li className="text-gray-400">Tutorials</li>
+                            <li className="text-gray-400">Support</li>
                         </ul>
                     </div>
 
@@ -42,10 +42,11 @@
                     <div>
                         <h3 className="text-lg font-semibold text-white mb-6">Legal</h3>
                         <ul className="space-y-3">
-                            <li><a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-                            <li><a href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
-                            <li><a href="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
+                            <li className="text-gray-400">Privacy Policy</li>
+                            <li className="text-gray-400">Terms of Service</li>
+                            <li className="text-gray-400">Contact</li>
                         </ul>
+
                     </div>
                 </div>
 

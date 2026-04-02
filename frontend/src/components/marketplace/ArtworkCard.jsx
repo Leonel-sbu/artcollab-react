@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Heart, ShoppingCart, Eye } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// Use empty string for development (uses Vite proxy)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 function resolveImageUrl(raw) {
     const u = String(raw || "").trim();

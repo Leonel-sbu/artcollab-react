@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
@@ -10,6 +10,10 @@ export default function Login() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the redirect destination from location state, default to /dashboard
+  const from = location.state?.from?.pathname || "/dashboard";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,7 +36,8 @@ export default function Login() {
         return;
       }
 
-      navigate("/dashboard");
+      // Redirect to the originally requested page, or fallback to /dashboard
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err?.message || "An error occurred during login.");
       console.error("Login error:", err);

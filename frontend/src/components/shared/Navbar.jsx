@@ -78,26 +78,43 @@ const Navbar = () => {
         }
     }, [user]);
 
-    // Fetch unread message count
+    // Fetch unread message count with AbortController
     useEffect(() => {
-        if (user) {
-            const fetchUnreadCount = async () => {
-                try {
-                    const response = await getUnreadCount();
-                    if (response.success) {
-                        setUnreadCount(response.totalUnread || 0);
-                    }
-                } catch (error) {
-                    console.error('Failed to fetch unread count:', error);
-                }
-            };
-            fetchUnreadCount();
-            // Poll every 30 seconds
-            const interval = setInterval(fetchUnreadCount, 30000);
-            return () => clearInterval(interval);
-        } else {
+        if (!user) {
             setUnreadCount(0);
+            return;
         }
+
+        const abortController = new AbortController();
+        let isMounted = true;
+
+        const fetchUnreadCount = async () => {
+            try {
+                const response = await getUnreadCount(abortController.signal);
+                if (isMounted && response.success) {
+                    setUnreadCount(response.totalUnread || 0);
+                }
+            } catch (error) {
+                // Ignore abort errors (cleanup)
+                if (error.name !== 'AbortError') {
+                    console.warn('Failed to fetch unread count:', error.message);
+                }
+            }
+        };
+
+        fetchUnreadCount();
+
+        // Poll every 30 seconds with new AbortController each time
+        const interval = setInterval(() => {
+            abortController.abort(); // Cancel previous request
+            fetchUnreadCount();
+        }, 30000);
+
+        return () => {
+            isMounted = false;
+            abortController.abort();
+            clearInterval(interval);
+        };
     }, [user]);
 
     return (

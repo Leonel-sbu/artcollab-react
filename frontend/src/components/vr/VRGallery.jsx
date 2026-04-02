@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { Eye, ChevronLeft, ChevronRight, Maximize2, X, Info } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+// Use empty string for development (uses Vite proxy)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 function resolveImageUrl(raw) {
     const u = String(raw || "").trim();
@@ -149,8 +150,8 @@ export default function VRGallery({ rooms = defaultRooms }) {
                             key={room.id}
                             onClick={() => handleRoomChange(index)}
                             className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition ${currentRoom === index
-                                    ? "bg-blue-500 text-white"
-                                    : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
+                                ? "bg-blue-500 text-white"
+                                : "bg-gray-700/50 text-gray-300 hover:bg-gray-700"
                                 }`}
                         >
                             {room.name}
@@ -167,8 +168,8 @@ export default function VRGallery({ rooms = defaultRooms }) {
                             key={artwork.id}
                             onClick={() => setCurrentArtwork(index)}
                             className={`flex-shrink-0 w-20 h-14 rounded-lg overflow-hidden border-2 transition ${currentArtwork === index
-                                    ? "border-blue-500"
-                                    : "border-transparent opacity-50 hover:opacity-100"
+                                ? "border-blue-500"
+                                : "border-transparent opacity-50 hover:opacity-100"
                                 }`}
                         >
                             <img

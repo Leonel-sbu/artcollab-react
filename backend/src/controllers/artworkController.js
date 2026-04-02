@@ -37,20 +37,41 @@ function sanitizeImageUrl(raw) {
   return "";
 }
 
-// GET /api/artworks?status=published&category=Abstract
+// GET /api/artworks?status=published&category=Abstract&page=1&limit=20
 exports.list = async (req, res) => {
   const { status, category, artist } = req.query || {};
+
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
 
   const filter = {};
   if (status) filter.status = String(status);
   if (category) filter.category = String(category);
   if (artist) filter.artist = String(artist);
 
-  const items = await Artwork.find(filter)
-    .populate("artist", "name role")
-    .sort({ createdAt: -1 });
+  const [items, total] = await Promise.all([
+    Artwork.find(filter)
+      .populate("artist", "name role")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Artwork.countDocuments(filter),
+  ]);
 
-  res.json({ success: true, items });
+  // Check if current user has liked each artwork
+  const userId = req.user?.id;
+  const itemsWithLikeStatus = items.map(item => {
+    const itemObj = item.toObject();
+    itemObj.likedByMe = userId ? item.likedBy?.includes(userId) : false;
+    return itemObj;
+  });
+
+  res.json({
+    success: true,
+    items: itemsWithLikeStatus,
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  });
 };
 
 // GET /api/artworks/:id
@@ -212,6 +233,103 @@ exports.getPending = async (req, res) => {
     res.json({ success: true, items });
   } catch (err) {
     console.error("Get pending artworks error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// POST /api/artworks/:id/like - Toggle like on artwork
+exports.toggleLike = async (req, res) => {
+  try {
+    const artwork = await Artwork.findById(req.params.id);
+    if (!artwork) {
+      return res.status(404).json({ success: false, message: "Artwork not found" });
+    }
+
+    const userId = req.user.id;
+    const likedIndex = artwork.likedBy.indexOf(userId);
+
+    if (likedIndex > -1) {
+      // User already liked - unlike
+      artwork.likedBy.splice(likedIndex, 1);
+      artwork.likes = Math.max(0, artwork.likes - 1);
+    } else {
+      // User hasn't liked - like
+      artwork.likedBy.push(userId);
+      artwork.likes = (artwork.likes || 0) + 1;
+    }
+
+    await artwork.save();
+
+    res.json({
+      success: true,
+      liked: likedIndex === -1,
+      likes: artwork.likes
+    });
+  } catch (err) {
+    console.error("Toggle like error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// POST /api/artworks/:id/view - Increment view count
+exports.incrementView = async (req, res) => {
+  try {
+    const artwork = await Artwork.findById(req.params.id);
+    if (!artwork) {
+      return res.status(404).json({ success: false, message: "Artwork not found" });
+    }
+
+    artwork.views = (artwork.views || 0) + 1;
+    await artwork.save();
+
+    res.json({ success: true, views: artwork.views });
+  } catch (err) {
+    console.error("Increment view error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/artworks/stats/categories - Get artwork count by category
+exports.getCategoryStats = async (req, res) => {
+  try {
+    const stats = await Artwork.aggregate([
+      { $match: { status: "published" } },
+      { $group: { _id: "$category", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const categoryCounts = {};
+    stats.forEach(s => {
+      categoryCounts[s._id || "Other"] = s.count;
+    });
+
+    res.json({ success: true, stats: categoryCounts, total: stats.reduce((sum, s) => sum + s.count, 0) });
+  } catch (err) {
+    console.error("Get category stats error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/artworks/stats/user/:userId - Get artwork count for specific user
+exports.getUserStats = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const total = await Artwork.countDocuments({ artist: userId, status: "published" });
+    const pending = await Artwork.countDocuments({ artist: userId, status: "pending" });
+
+    const categoryStats = await Artwork.aggregate([
+      { $match: { artist: userId, status: "published" } },
+      { $group: { _id: "$category", count: { $sum: 1 } } }
+    ]);
+
+    const categoryCounts = {};
+    categoryStats.forEach(s => {
+      categoryCounts[s._id || "Other"] = s.count;
+    });
+
+    res.json({ success: true, total, pending, categories: categoryCounts });
+  } catch (err) {
+    console.error("Get user stats error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };

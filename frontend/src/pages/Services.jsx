@@ -1,6 +1,7 @@
 // src/pages/Services.jsx - Complete Services Page with Full Backend Integration
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
     Palette, Search, Filter, Plus, X, Clock, CheckCircle,
     Star, Trash2, Edit, Eye, Calendar, DollarSign,
@@ -32,6 +33,7 @@ const statusColors = {
 
 const Services = () => {
     const { user, isAuthed } = useAuth();
+    const navigate = useNavigate();
 
     // Tab state
     const [activeTab, setActiveTab] = useState("browse"); // browse, my-services, bookings
@@ -92,6 +94,9 @@ const Services = () => {
             }
         } catch (err) {
             console.error("Failed to load categories:", err);
+            if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            }
         }
     };
 
@@ -122,7 +127,15 @@ const Services = () => {
             }
         } catch (err) {
             console.error("Failed to load data:", err);
-            toast.error("Failed to load data");
+            if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            } else if (err.response?.status === 401) {
+                toast.error("Please log in to view this content.");
+            } else if (err.response?.status === 403) {
+                toast.error("Access denied.");
+            } else {
+                toast.error("Failed to load data");
+            }
         } finally {
             setLoading(false);
         }
@@ -179,12 +192,6 @@ const Services = () => {
             return;
         }
 
-        // Prevent booking demo services
-        if (selectedService.isDemo) {
-            toast.error("Demo services cannot be booked");
-            return;
-        }
-
         try {
             // Build payload - backend gets serviceId from URL, so only send booking details
             const payload = {
@@ -195,12 +202,17 @@ const Services = () => {
 
             const res = await bookService(selectedService._id, payload);
             if (res?.success) {
-                toast.success("Service booked successfully!");
+                toast.success("Service booked! Redirecting to messages...");
                 setShowBookingModal(false);
                 setBookingData({ title: "", description: "", budget: "" });
-                // Refresh bookings and switch to bookings tab
+                // Refresh bookings
                 loadData();
-                setActiveTab("bookings");
+                // Redirect to messages to talk with the artist
+                if (res.conversationId) {
+                    navigate(`/messages/${res.conversationId}`);
+                } else {
+                    navigate("/messages");
+                }
             } else {
                 toast.error(res?.message || "Failed to book service");
             }
@@ -255,16 +267,7 @@ const Services = () => {
         }
     };
 
-    // Default services for browsing when API is empty
-    // Marked as isDemo: true to prevent booking requests to backend
-    const defaultServices = [
-        { _id: "1", title: "Custom Portrait Commission", description: "Professional portrait artwork tailored to your vision", category: "portrait", budget: 500, deliveryDays: 14, revisions: 3, artist: { name: "Artists" }, features: ["High resolution", "2 revisions included", "Source files"], isDemo: true },
-        { _id: "2", title: "Digital Illustration", description: "Custom digital artwork for any purpose", category: "digital", budget: 300, deliveryDays: 7, revisions: 2, artist: { name: "Digital Studios" }, features: ["PNG & JPEG", "1 revision", "Commercial use"], isDemo: true },
-        { _id: "3", title: "NFT Artwork", description: "Unique NFT-ready artwork for collection", category: "nft", budget: 200, deliveryDays: 5, revisions: 1, artist: { name: "NFT Creators" }, features: ["Multiple formats", "Metadata ready", "Collection ready"], isDemo: true },
-        { _id: "4", title: "Logo Design", description: "Professional logo design for your brand", category: "logo", budget: 400, deliveryDays: 10, revisions: 3, artist: { name: "Design Pro" }, features: ["Vector files", "Brand guidelines", "Unlimited concepts"], isDemo: true },
-    ];
-
-    const displayServices = services.length > 0 ? services : defaultServices;
+    // No demo services - only show real services from database
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
@@ -371,7 +374,7 @@ const Services = () => {
                     </div>
                 ) : (
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {(activeTab === "browse" ? displayServices : activeTab === "my-services" ? myServices : myBookings).map((service, index) => (
+                        {(activeTab === "browse" ? services : activeTab === "my-services" ? myServices : myBookings).map((service, index) => (
                             <motion.div
                                 key={service._id || index}
                                 initial={{ opacity: 0, y: 20 }}
@@ -433,20 +436,12 @@ const Services = () => {
                                                 >
                                                     View
                                                 </button>
-                                                {isAuthed && !service.isDemo && (
+                                                {isAuthed && (
                                                     <button
                                                         onClick={() => { setSelectedService(service); setShowBookingModal(true); }}
                                                         className="flex-1 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 rounded-lg text-sm font-medium transition"
                                                     >
                                                         Book
-                                                    </button>
-                                                )}
-                                                {isAuthed && service.isDemo && (
-                                                    <button
-                                                        disabled
-                                                        className="flex-1 py-2 bg-gray-600 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
-                                                    >
-                                                        Demo
                                                     </button>
                                                 )}
                                             </>
@@ -487,7 +482,7 @@ const Services = () => {
                 )}
 
                 {/* Empty State */}
-                {!loading && (activeTab === "browse" ? displayServices : activeTab === "my-services" ? myServices : myBookings).length === 0 && (
+                {!loading && (activeTab === "browse" ? services : activeTab === "my-services" ? myServices : myBookings).length === 0 && (
                     <div className="text-center py-16">
                         <Palette className="w-16 h-16 text-gray-600 mx-auto mb-4" />
                         <h3 className="text-xl font-semibold mb-2">No services found</h3>
@@ -741,23 +736,14 @@ const Services = () => {
                                 )}
                             </div>
 
-                            {isAuthed && !selectedService?.isDemo && (
+                            {isAuthed ? (
                                 <button
                                     onClick={() => { setShowViewModal(false); setShowBookingModal(true); }}
                                     className="w-full mt-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 rounded-lg font-semibold"
                                 >
                                     Book This Service
                                 </button>
-                            )}
-                            {isAuthed && selectedService?.isDemo && (
-                                <button
-                                    disabled
-                                    className="w-full mt-6 py-3 bg-gray-600 text-gray-400 rounded-lg font-semibold cursor-not-allowed"
-                                >
-                                    Demo - Cannot Book
-                                </button>
-                            )}
-                            {!isAuthed && (
+                            ) : (
                                 <button
                                     onClick={() => toast.error("Please login to book services")}
                                     className="w-full mt-6 py-3 bg-gray-600 text-gray-300 rounded-lg font-semibold"

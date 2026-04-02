@@ -6,7 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import {
     getConversations,
     getMessages,
-    sendMessage
+    sendMessage,
+    getConversation
 } from '../services/messageService';
 import ConversationList from '../components/messaging/ConversationList';
 import ChatWindow from '../components/messaging/ChatWindow';
@@ -32,6 +33,11 @@ const MessagesPage = () => {
             }
         } catch (error) {
             console.error('Failed to load conversations:', error);
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            } else if (error.response?.status === 401) {
+                toast.error("Please log in to view messages.");
+            }
         } finally {
             setConversationsLoaded(true);
         }
@@ -54,6 +60,13 @@ const MessagesPage = () => {
             }
         } catch (error) {
             console.error('Failed to load messages:', error);
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            } else if (error.response?.status === 401) {
+                toast.error("Please log in to view messages.");
+            } else if (error.response?.status === 403) {
+                toast.error("Access denied to this conversation.");
+            }
         } finally {
             setLoading(false);
         }
@@ -69,20 +82,37 @@ const MessagesPage = () => {
         // Don't process until conversations have loaded
         if (!conversationsLoaded) return;
 
-        if (conversationId) {
-            // Find conversation in list
-            const conv = conversations.find(c => c._id === conversationId);
-            if (conv) {
-                setSelectedConversation(conv);
-                loadMessages(conversationId);
+        const loadConv = async () => {
+            if (conversationId) {
+                // Find conversation in list first
+                let conv = conversations.find(c => c._id === conversationId);
+
+                // If not found in list, fetch it directly (e.g., from booking)
+                if (!conv) {
+                    try {
+                        const result = await getConversation(conversationId);
+                        if (result.success) {
+                            conv = result.conversation;
+                        }
+                    } catch (error) {
+                        console.error('Failed to load conversation:', error);
+                    }
+                }
+
+                if (conv) {
+                    setSelectedConversation(conv);
+                    loadMessages(conversationId);
+                } else {
+                    // If conversationId doesn't match any conversation, navigate back
+                    navigate('/messages');
+                }
             } else {
-                // If conversationId doesn't match any conversation, navigate back
-                navigate('/messages');
+                setSelectedConversation(null);
+                setMessages([]);
             }
-        } else {
-            setSelectedConversation(null);
-            setMessages([]);
-        }
+        };
+
+        loadConv();
     }, [conversationId, conversations, conversationsLoaded, loadMessages, navigate]);
 
     // Handle selecting a conversation

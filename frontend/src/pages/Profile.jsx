@@ -56,6 +56,11 @@ export default function Profile() {
             });
         } catch (error) {
             console.error('Failed to load user data:', error);
+            if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+                toast.error("Unable to connect to server. Please check your connection.");
+            } else if (error.response?.status === 401) {
+                toast.error("Please log in to view your profile.");
+            }
         } finally {
             setLoading(false);
         }

@@ -29,7 +29,7 @@ function getCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: 'lax', // Use 'lax' for development, 'strict' in production if needed
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
   };
 }
@@ -154,9 +154,15 @@ exports.login = async (req, res) => {
   if (!user) {
     // Check regular users
     user = await User.findOne({ email: emailLower }).select("name email role passwordHash");
+    // Also check if user has admin role in User collection
+    if (user && user.role === 'admin') {
+      isAdminLogin = true;
+    }
   }
 
-  if (!user) return res.status(401).json({ success: false, message: "Invalid credentials" });
+  if (!user) {
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
+  }
 
   const ok = await user.comparePassword(password);
   if (!ok) return res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -188,14 +194,14 @@ exports.me = async (req, res) => {
  */
 exports.logout = async (req, res) => {
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: isProduction,
     sameSite: isProduction ? 'strict' : 'lax',
     path: '/',
   });
-  
+
   return res.json({
     success: true,
     message: "Logged out successfully"

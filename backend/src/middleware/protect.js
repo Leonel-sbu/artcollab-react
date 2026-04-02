@@ -91,6 +91,10 @@ const protect = async (req, res, next) => {
         // Attach user to request and flag if admin
         req.user = user;
         req.user.isAdmin = isAdmin;
+        // Also set role for easier access in controllers
+        if (isAdmin) {
+            req.user.role = 'admin';
+        }
         next();
     } catch (error) {
         if (error.name === 'JsonWebTokenError') {

@@ -19,5 +19,16 @@ router.get('/users', c.listUsers);
 router.get('/artworks/pending', c.pendingArtworks);
 router.get('/reports', c.listReports);
 
+// Course management
+router.get('/courses', c.listAllCourses);
+router.put('/courses/:id/status', adminLimiter, c.setCourseStatus);
+
+// Order management
+router.get('/orders', c.listAllOrders);
+
+// Enrollment / student management
+router.get('/enrollments', c.listEnrollments);
+router.delete('/enrollments/:id', adminLimiter, c.removeEnrollment);
+
 module.exports = router;
 

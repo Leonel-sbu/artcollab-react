@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Heart, Image as ImageIcon, Send } from "lucide-react";
 import toast from "react-hot-toast";
+import InlineLoader from "../components/shared/InlineLoader";
 
 import { resolveImageUrl } from "../utils/resolveImage";
 import {
@@ -24,8 +25,13 @@ export default function Community() {
       try {
         const res = await listPosts();
         if (res?.success) setPosts(res.posts || []);
-      } catch {
-        toast.error("Failed to load posts");
+      } catch (error) {
+        console.error('Failed to load posts:', error);
+        if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+          toast.error("Unable to connect to server. Please check your connection.");
+        } else {
+          toast.error("Failed to load posts");
+        }
       }
     })();
   }, []);
@@ -87,10 +93,10 @@ export default function Community() {
       posts.map((p) =>
         p._id === postId
           ? {
-              ...p,
-              comments: [...(p.comments || []), optimisticComment],
-              commentsCount: (p.commentsCount || 0) + 1,
-            }
+            ...p,
+            comments: [...(p.comments || []), optimisticComment],
+            commentsCount: (p.commentsCount || 0) + 1,
+          }
           : p
       )
     );
@@ -105,10 +111,10 @@ export default function Community() {
         posts.map((p) =>
           p._id === postId
             ? {
-                ...p,
-                comments: res.comments,
-                commentsCount: res.commentsCount,
-              }
+              ...p,
+              comments: res.comments,
+              commentsCount: res.commentsCount,
+            }
             : p
         )
       );
@@ -179,9 +185,8 @@ export default function Community() {
 
             <button
               onClick={() => handleLike(post._id)}
-              className={`flex items-center gap-2 ${
-                post.likedByMe ? "text-red-500" : "text-gray-400"
-              }`}
+              className={`flex items-center gap-2 ${post.likedByMe ? "text-red-500" : "text-gray-400"
+                }`}
             >
               <Heart
                 className="w-5 h-5"
@@ -195,11 +200,10 @@ export default function Community() {
               {post.comments?.map((c) => (
                 <div
                   key={c._id}
-                  className={`text-sm p-2 rounded ${
-                    c.optimistic
-                      ? "bg-gray-800 opacity-70"
-                      : "bg-gray-900"
-                  }`}
+                  className={`text-sm p-2 rounded ${c.optimistic
+                    ? "bg-gray-800 opacity-70"
+                    : "bg-gray-900"
+                    }`}
                 >
                   <span className="font-semibold text-blue-400">
                     {c.user?.name}

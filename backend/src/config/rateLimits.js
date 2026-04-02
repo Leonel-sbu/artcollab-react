@@ -19,10 +19,10 @@ const generalLimiter = rateLimit({
 // Strict limiter for authentication endpoints
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 attempts per window
+    max: 500, // 500 attempts per window (increased for testing)
     message: {
         success: false,
-        message: 'Too many authentication attempts, please try again later.'
+        message: 'Too many login attempts. Please try again in 15 minutes.'
     },
     standardHeaders: true,
     legacyHeaders: false

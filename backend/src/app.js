@@ -68,17 +68,76 @@ app.use(
 );
 
 /* ------------------------------- CORS ------------------------------------ */
-app.use(
-  cors({
-    origin: [process.env.CLIENT_URL || "http://localhost:5173", "http://localhost:5174"],
-    credentials: true,
-  })
-);
+// Production-safe CORS configuration
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    // In production, only allow the configured CLIENT_URL
+    const allowedOrigins = [];
+
+    // Always allow the configured CLIENT_URL
+    if (process.env.CLIENT_URL) {
+      allowedOrigins.push(process.env.CLIENT_URL);
+    }
+
+    // In development, allow localhost
+    if (process.env.NODE_ENV !== 'production') {
+      allowedOrigins.push('http://localhost:5173');
+      allowedOrigins.push('http://localhost:5174');
+      allowedOrigins.push('http://127.0.0.1:5173');
+      allowedOrigins.push('http://127.0.0.1:5174');
+    }
+
+    // Check if origin is in allowed list
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'CSRF-Token', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+
+/* ---------------------------- RATE LIMITING ------------------------------- */
+const rateLimit = require('express-rate-limit');
+
+// Global rate limiter - applies to all routes
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip successful requests
+  skipSuccessfulRequests: false
+});
+
+// Apply global rate limiter
+app.use(globalLimiter);
 
 /* ----------------------------- BODY PARSING ------------------------------ */
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+/* --------------------------- HTTPS REDIRECT ------------------------------- */
+// Redirect HTTP to HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
 
 /* --------------------------- INPUT SANITIZATION --------------------------- */
 // Sanitize all request body inputs to prevent XSS
@@ -96,13 +155,12 @@ app.use((req, res, next) => {
 // Custom CSRF middleware with route exemptions
 const csrfMiddleware = require('./middleware/csrfMiddleware');
 
-// Public endpoint to get CSRF token - must be before routes that need protection
-app.get('/api/csrf-token', csrfMiddleware.csrfProtection, (req, res) => {
-  // Token is automatically set in cookie by csurf
-  res.json({ csrfToken: req.csrfToken() });
-});
+// Public endpoint to get CSRF token
+app.get('/api/csrf-token', csrfMiddleware.getCsrfToken);
 
-// Apply CSRF protection to all other routes (excludes webhook, health, csrf-token)
+// Apply CSRF middleware to all other routes (excludes webhook, health, csrf-token)
+// CSRF token is generated automatically for GET requests
+// For POST/PUT/DELETE, use verifyCsrf middleware in specific routes
 app.use(csrfMiddleware);
 
 /* ------------------------------ LOGGING ---------------------------------- */

@@ -18,6 +18,7 @@ const upload = multer({ storage });
 // Public routes
 router.get("/", c.list);
 router.get("/categories", c.getCategories);
+router.get("/stats", c.getStats);  // Add stats endpoint
 router.get("/my-services", protect, c.myServices);
 router.get("/my-bookings", protect, c.myBookings);
 router.get("/:id", c.getById);

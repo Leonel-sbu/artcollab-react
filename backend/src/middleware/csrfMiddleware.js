@@ -1,8 +1,12 @@
 /**
  * CSRF Protection Middleware
- * Wraps csurf but exempts certain routes
+ * Uses the new csrf package (not the deprecated csurf)
+ * csrf v3.x API: https://www.npmjs.com/package/csrf
  */
-const csrf = require("csurf");
+const csrf = require('csrf');
+
+// Create CSRF instance
+const tokens = new csrf();
 
 // Routes that don't need CSRF protection
 // These are authentication entry points - users can't have CSRF token before authenticating
@@ -17,14 +21,50 @@ const exemptRoutes = [
     '/api/auth/logout',              // Users need to logout without having a CSRF token
 ];
 
-// Create CSRF protection with cookie storage
-const csrfProtection = csrf({
-    cookie: {
+/**
+ * Generate a CSRF token
+ * @returns {object} - { token: string, secret: string }
+ */
+const generateToken = () => {
+    const secret = tokens.secretSync();
+    const token = tokens.create(secret);
+    return { token, secret };
+};
+
+// Generate CSRF token endpoint
+const getCsrfToken = (req, res) => {
+    const { token, secret } = generateToken();
+    // Store secret in session or cookie (for simplicity, we'll send it as a cookie)
+    res.cookie('csrf-secret', secret, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict'
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    res.json({ csrfToken: token });
+};
+
+// Middleware to verify CSRF token on state-changing requests
+const verifyCsrf = (req, res, next) => {
+    const token = req.body._csrf || req.headers['x-csrf-token'];
+    const secret = req.cookies['csrf-secret'];
+
+    if (!token || !secret) {
+        return res.status(403).json({
+            success: false,
+            message: 'CSRF token missing'
+        });
     }
-});
+
+    if (!tokens.verify(secret, token)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Invalid CSRF token'
+        });
+    }
+
+    next();
+};
 
 module.exports = function csrfMiddleware(req, res, next) {
     // Skip CSRF for exempt routes
@@ -34,8 +74,22 @@ module.exports = function csrfMiddleware(req, res, next) {
         return next();
     }
 
-    // Apply CSRF protection to all other routes
-    csrfProtection(req, res, next);
+    // For GET requests, just generate a new token
+    if (req.method === 'GET') {
+        const { token, secret } = generateToken();
+        res.cookie('csrf-secret', secret, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000
+        });
+        req.csrfToken = token;
+    }
+
+    // For other methods, verify the token (applied via verifyCsrf middleware in routes)
+    next();
 };
 
-module.exports.csrfProtection = csrfProtection;
+// Export both middleware functions
+module.exports.getCsrfToken = getCsrfToken;
+module.exports.verifyCsrf = verifyCsrf;

@@ -9,9 +9,10 @@ const getApiBaseUrl = () => {
     if (import.meta.env.PROD) {
       throw new Error('VITE_API_BASE_URL is required in production');
     }
-    // Development fallback
-    console.warn('WARNING: VITE_API_BASE_URL not set, using localhost');
-    return 'http://localhost:5000';
+    // Development: Use relative path to leverage Vite proxy
+    // This avoids CORS issues by forwarding through Vite's dev server
+    console.warn('WARNING: VITE_API_BASE_URL not set, using relative path (via Vite proxy)');
+    return '';  // Empty string = relative URL = uses Vite proxy
   }
 
   // Validate HTTPS in production
@@ -77,11 +78,26 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle 401 errors - redirect to login if needed
-    if (error.response?.status === 401) {
-      // Could dispatch a logout action here if needed
-      console.log("Auth error:", error.response?.data?.message);
+    // Enhanced error handling for better debugging
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+    const url = error.config?.url;
+
+    // Log detailed error information
+    if (status === 401) {
+      console.log("Auth error:", message);
+    } else if (status === 403) {
+      console.log("Forbidden error:", message, "URL:", url);
+    } else if (status === 404) {
+      console.log("Not found:", "URL:", url);
+    } else if (status >= 500) {
+      console.log("Server error:", status, message);
+    } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      console.error("Network error detected:", error.message, "URL:", url);
+      // Provide more context for network errors
+      error.userMessage = 'Unable to connect to server. Please check your internet connection.';
     }
+
     return Promise.reject(error);
   }
 );

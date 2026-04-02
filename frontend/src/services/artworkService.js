@@ -65,3 +65,48 @@ export async function listArtworks(params = {}) {
   const res = await api.get("/api/artworks", { params });
   return res.data;
 }
+
+/**
+ * GET ARTWORK BY ID
+ * GET /api/artworks/:id
+ */
+export async function getArtworkById(id) {
+  const res = await api.get(`/api/artworks/${id}`);
+  return res.data;
+}
+
+/**
+ * TOGGLE LIKE ON ARTWORK
+ * POST /api/artworks/:id/like
+ */
+export async function toggleArtworkLike(id) {
+  const res = await api.post(`/api/artworks/${id}/like`);
+  return res.data;
+}
+
+/**
+ * INCREMENT VIEW COUNT
+ * POST /api/artworks/:id/view
+ */
+export async function incrementArtworkView(id) {
+  const res = await api.post(`/api/artworks/${id}/view`);
+  return res.data;
+}
+
+/**
+ * GET CATEGORY STATS
+ * GET /api/artworks/stats/categories
+ */
+export async function getCategoryStats() {
+  const res = await api.get("/api/artworks/stats/categories");
+  return res.data;
+}
+
+/**
+ * GET USER ARTWORK STATS
+ * GET /api/artworks/stats/user/:userId
+ */
+export async function getUserArtworkStats(userId) {
+  const res = await api.get(`/api/artworks/stats/user/${userId}`);
+  return res.data;
+}

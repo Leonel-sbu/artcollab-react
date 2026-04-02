@@ -11,7 +11,12 @@ exports.getCart = async (req, res) => {
   if (!req.user) {
     return res.json({ success: true, cart: { items: [] }, subtotal: 0 });
   }
-  const cart = (await Cart.findOne({ user: req.user.id })) || (await Cart.create({ user: req.user.id, items: [] }));
+  // Use findOneAndUpdate with upsert to avoid race condition/duplicate key error
+  const cart = await Cart.findOneAndUpdate(
+    { user: req.user.id },
+    { $setOnInsert: { items: [] } },
+    { upsert: true, new: true }
+  );
   res.json({ success: true, cart, subtotal: calcSubtotal(cart.items) });
 };
 
@@ -44,6 +49,19 @@ exports.checkout = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Cart is empty' });
   }
 
+  // Prevent duplicate pending orders
+  const existingPending = await Order.findOne({
+    user: req.user.id,
+    status: 'pending'
+  });
+
+  if (existingPending) {
+    return res.status(400).json({
+      success: false,
+      message: 'You already have a pending order. Complete or abandon it first.'
+    });
+  }
+
   const subtotal = calcSubtotal(cart.items);
 
   const order = await Order.create({
@@ -54,15 +72,25 @@ exports.checkout = async (req, res) => {
     paymentProvider: 'manual'
   });
 
-  cart.items = [];
-  await cart.save();
+  // Do NOT clear cart here.
+  // Cart must only be cleared after successful payment.
 
   res.status(201).json({ success: true, order });
 };
 
 exports.myOrders = async (req, res) => {
-  const items = await Order.find({ user: req.user.id }).sort({ createdAt: -1 });
-  res.json({ success: true, items });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
+
+  const filter = { user: req.user.id };
+
+  const [items, total] = await Promise.all([
+    Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Order.countDocuments(filter),
+  ]);
+
+  res.json({ success: true, items, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };
 
 exports.getOrder = async (req, res) => {
@@ -70,4 +98,3 @@ exports.getOrder = async (req, res) => {
   if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
   res.json({ success: true, order });
 };
-

@@ -3,21 +3,25 @@ const Notification = require("../models/Notification");
 
 /* ----------------------------- LIST POSTS ----------------------------- */
 exports.listPosts = async (req, res) => {
-  const posts = await Post.find()
-    .populate("author", "name")
-    .populate({ path: "comments.user", select: "name" })
-    .sort({ createdAt: -1 });
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const skip = (page - 1) * limit;
 
-  res.json({ success: true, posts });
+  const [posts, total] = await Promise.all([
+    Post.find()
+      .populate("author", "name")
+      .populate({ path: "comments.user", select: "name" })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Post.countDocuments(),
+  ]);
+
+  res.json({ success: true, posts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
 };
 
 /* ----------------------------- CREATE POST ---------------------------- */
 exports.createPost = async (req, res) => {
-  console.log("=== CREATE POST DEBUG ===");
-  console.log("BODY:", req.body);
-  console.log("FILE:", req.file);
-  console.log("=========================");
-
   const { content } = req.body;
 
   if (!content && !req.file) {
@@ -68,7 +72,6 @@ exports.addComment = async (req, res) => {
   await post.save();
 
   if (!post.author.equals(req.user.id)) {
-    console.log(' Creating notification...');
     await Notification.create({
       recipient: post.author,
       sender: req.user.id,
@@ -103,7 +106,6 @@ exports.toggleLike = async (req, res) => {
     likedByMe = true;
 
     if (!post.author.equals(userId)) {
-      console.log(' Creating notification...');
       await Notification.create({
         recipient: post.author,
         sender: userId,

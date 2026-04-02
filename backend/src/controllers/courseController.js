@@ -227,6 +227,38 @@ exports.remove = async (req, res) => {
   }
 };
 
+/* ----------------------------- COURSE CHECKOUT ----------------------------- */
+exports.checkout = async (req, res) => {
+  try {
+    const Stripe = require('stripe');
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const price = course.pricing?.oneTime?.price;
+    if (!price || price <= 0) {
+      return res.status(400).json({ success: false, message: 'Course is free — no payment needed' });
+    }
+
+    const existing = await Enrollment.findOne({ user: req.user.id, course: course._id });
+    if (existing) {
+      return res.json({ success: false, message: 'Already enrolled' });
+    }
+
+    const pi = await stripe.paymentIntents.create({
+      amount: Math.round(price * 100),
+      currency: 'zar',
+      metadata: { courseId: String(course._id), userId: String(req.user.id) }
+    });
+
+    res.json({ success: true, clientSecret: pi.client_secret, amount: price });
+  } catch (err) {
+    console.error('Course checkout error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 /* ----------------------------- ENROLL IN COURSE ----------------------------- */
 exports.enroll = async (req, res) => {
   try {
@@ -241,6 +273,23 @@ exports.enroll = async (req, res) => {
 
     if (enrollment) {
       return res.json({ success: true, message: 'Already enrolled', enrollment });
+    }
+
+    // Verify payment for paid courses
+    if (course.pricing?.oneTime?.price > 0) {
+      const { paymentIntentId } = req.body;
+      if (!paymentIntentId) {
+        return res.status(400).json({ success: false, message: 'Payment required for this course' });
+      }
+      const Stripe = require('stripe');
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (pi.status !== 'succeeded') {
+        return res.status(400).json({ success: false, message: 'Payment not completed' });
+      }
+      if (pi.metadata?.courseId !== String(courseId)) {
+        return res.status(403).json({ success: false, message: 'Invalid payment for this course' });
+      }
     }
 
     // Create enrollment

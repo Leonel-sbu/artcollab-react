@@ -95,8 +95,27 @@ async function handlePaymentSucceeded(paymentIntent) {
 async function handlePaymentFailed(paymentIntent) {
     const orderId = paymentIntent.metadata?.orderId;
 
-    if (orderId) {
-        console.log(`Payment failed for order ${orderId}: ${paymentIntent.last_payment_error?.message}`);
-        // Could update order status to 'payment_failed' here
+    if (!orderId) {
+        console.log('Payment failed but no orderId in metadata');
+        return;
+    }
+
+    try {
+        const order = await Order.findById(orderId);
+        if (!order) {
+            console.error(`Order not found for failed payment: ${orderId}`);
+            return;
+        }
+
+        // Only update if still pending — don't overwrite a paid order
+        if (order.status === 'pending') {
+            order.status = 'payment_failed';
+            order.paymentProvider = 'stripe';
+            order.paymentRef = paymentIntent.id;
+            await order.save();
+            console.log(`Order ${orderId} marked as payment_failed: ${paymentIntent.last_payment_error?.message}`);
+        }
+    } catch (error) {
+        console.error('Error handling payment failed:', error);
     }
 }

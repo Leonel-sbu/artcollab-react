@@ -6,6 +6,10 @@ router.get('/', (req, res) => {
   res.json({ success: true, module: 'payments' });
 });
 
+router.get('/config', (req, res) => {
+  res.json({ success: true, publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '' });
+});
+
 router.post('/create-payment-intent', protect, c.createPaymentIntent);
 
 // confirm after client payment

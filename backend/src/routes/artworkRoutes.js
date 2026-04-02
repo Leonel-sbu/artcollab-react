@@ -20,6 +20,8 @@ const updateArtworkValidation = [
     body('price').optional().isNumeric().withMessage('Price must be a number'),
 ];
 
+router.get('/stats/categories', c.getCategoryStats);
+router.get('/stats/user/:userId', c.getUserStats);
 router.get('/', c.list);
 router.get('/pending', protect, c.getPending);
 router.get('/:id', c.getById);
@@ -31,5 +33,9 @@ router.delete('/:id', protect, c.remove);
 // Admin routes - require admin role
 router.post('/:id/approve', protect, authorize('admin'), c.approve);
 router.post('/:id/reject', protect, authorize('admin'), c.reject);
+
+// Like and view routes
+router.post('/:id/like', protect, c.toggleLike);
+router.post('/:id/view', c.incrementView);
 
 module.exports = router;
