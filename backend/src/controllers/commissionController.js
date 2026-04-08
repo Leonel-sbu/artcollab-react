@@ -139,6 +139,10 @@ exports.createService = async (req, res) => {
       return res.status(400).json({ success: false, message: "Title is required" });
     }
 
+    // Process features and tags from comma-separated strings
+    const processedFeatures = features ? features.split(',').map(f => f.trim()).filter(f => f) : [];
+    const processedTags = tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [];
+
     const commission = await Commission.create({
       buyer: req.user.id,
       artist: req.user.id,
@@ -146,13 +150,14 @@ exports.createService = async (req, res) => {
       description: description || "",
       category: category || "illustration",
       images: images || [],
+      image: req.file ? `/uploads/services/${req.file.filename}` : null,
       pricing: pricing || {},
       budget: budget || 0,
       currency: currency || "ZAR",
-      tags: tags || [],
+      tags: processedTags,
       deliveryDays: deliveryDays || 7,
       revisions: revisions || 3,
-      features: features || [],
+      features: processedFeatures,
       featured: featured || false,
       isService: true,
       status: "requested"

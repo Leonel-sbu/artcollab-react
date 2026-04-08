@@ -5,6 +5,16 @@ function calcSubtotal(items) {
   return (items || []).reduce((sum, it) => sum + (Number(it.price || 0) * Number(it.qty || 1)), 0);
 }
 
+// PUBLIC - Get all orders
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find({}).sort({ createdAt: -1 }).limit(50);
+    res.json({ success: true, items: orders, pagination: { page: 1, limit: 50, total: orders.length } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // CART
 exports.getCart = async (req, res) => {
   // Return empty cart for unauthenticated users

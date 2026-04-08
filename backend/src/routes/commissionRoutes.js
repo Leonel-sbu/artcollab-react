@@ -24,7 +24,7 @@ router.get("/my-bookings", protect, c.myBookings);
 router.get("/:id", c.getById);
 
 // Protected routes
-router.post("/", protect, upload.array("images", 6), c.createService);
+router.post("/", protect, upload.single("image"), c.createService);
 router.post("/:id/book", protect, c.book);
 router.patch("/:id", protect, c.updateService);
 router.patch("/:id/status", protect, c.updateStatus);

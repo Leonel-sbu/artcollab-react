@@ -76,11 +76,11 @@ async function seed() {
                 difficulty: 'beginner',
                 tags: ['digital', 'painting', 'art'],
                 lessons: [
-                    { title: 'Introduction to Digital Art', description: 'Getting started with digital tools', videoUrl: 'https://example.com/video1', durationSec: 1800, order: 1 },
-                    { title: 'Color Theory Basics', description: 'Understanding colors', videoUrl: 'https://example.com/video2', durationSec: 2400, order: 2 },
-                    { title: 'Brush Techniques', description: 'Mastering brushes', videoUrl: 'https://example.com/video3', durationSec: 3600, order: 3 }
+                    { title: 'Introduction to Digital Art', description: 'Getting started with digital tools', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', durationSec: 1800, order: 1 },
+                    { title: 'Color Theory Basics', description: 'Understanding colors', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', durationSec: 2400, order: 2 },
+                    { title: 'Brush Techniques', description: 'Mastering brushes', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', durationSec: 3600, order: 3 }
                 ],
-                enrollmentCount: 1245,
+                enrollmentCount: 0,
                 status: 'published',
                 learningOutcomes: ['Master digital painting', 'Understand color theory', 'Create artwork']
             },
@@ -99,10 +99,10 @@ async function seed() {
                 difficulty: 'beginner',
                 tags: ['3d', 'modeling', 'blender'],
                 lessons: [
-                    { title: 'Getting Started with 3D', description: 'Introduction to 3D space', videoUrl: 'https://example.com/video1', durationSec: 1800, order: 1 },
-                    { title: 'Basic Shapes', description: 'Creating primitives', videoUrl: 'https://example.com/video2', durationSec: 2400, order: 2 }
+                    { title: 'Getting Started with 3D', description: 'Introduction to 3D space', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', durationSec: 1800, order: 1 },
+                    { title: 'Basic Shapes', description: 'Creating primitives', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', durationSec: 2400, order: 2 }
                 ],
-                enrollmentCount: 892,
+                enrollmentCount: 0,
                 status: 'published',
                 learningOutcomes: ['Create 3D models', 'Use modeling software', 'Build scenes']
             },
@@ -121,10 +121,10 @@ async function seed() {
                 difficulty: 'intermediate',
                 tags: ['AI', 'art', 'midjourney', 'stable diffusion'],
                 lessons: [
-                    { title: 'AI Art Tools Overview', description: 'Overview of available tools', videoUrl: 'https://example.com/video1', durationSec: 1800, order: 1 },
-                    { title: 'Prompts Mastery', description: 'Writing effective prompts', videoUrl: 'https://example.com/video2', durationSec: 2400, order: 2 }
+                    { title: 'AI Art Tools Overview', description: 'Overview of available tools', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', durationSec: 1800, order: 1 },
+                    { title: 'Prompts Mastery', description: 'Writing effective prompts', videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', durationSec: 2400, order: 2 }
                 ],
-                enrollmentCount: 2103,
+                enrollmentCount: 0,
                 status: 'published',
                 learningOutcomes: ['Use AI art tools', 'Write better prompts', 'Create AI artwork']
             }

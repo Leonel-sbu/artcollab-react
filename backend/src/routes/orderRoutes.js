@@ -1,6 +1,9 @@
-﻿const router = require('express').Router();
+const router = require('express').Router();
 const { protect, authorize } = require('../middleware/authMiddleware');
 const c = require('../controllers/orderController');
+
+// Public routes
+router.get('/', c.getAllOrders);
 
 router.post('/checkout', protect, c.checkout);
 router.get('/mine', protect, c.myOrders);

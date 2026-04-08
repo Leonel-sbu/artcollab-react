@@ -63,3 +63,7 @@ coverage/
 
 # Kilo CLI
 .kilo/
+
+# Windows reserved filenames fix
+nul
+backend/nul

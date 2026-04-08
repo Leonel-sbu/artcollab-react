@@ -1,0 +1,11 @@
+﻿/* ---------- IMAGE HANDLING FIX ---------- */
+const imagePath = req.file
+  ? `/uploads/posts/${req.file.filename}`
+  : null;
+
+/* Save using forward slashes only */
+const post = await Post.create({
+  author: req.user.id,
+  content,
+  media: imagePath ? [imagePath] : [],
+});

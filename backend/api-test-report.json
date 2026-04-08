@@ -1,0 +1,58 @@
+[
+    {
+        "name":  "GET /",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/payments",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/artworks",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/courses",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/cart",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/orders/mine",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/community",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    },
+    {
+        "name":  "GET /api/services",
+        "ok":  true,
+        "status":  "OK",
+        "success":  true,
+        "note":  ""
+    }
+]

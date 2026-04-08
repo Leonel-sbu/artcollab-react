@@ -1,4 +1,4 @@
-# Deployment Guide for ARTCOLLAB-APP
+ # Deployment Guide for ARTCOLLAB-APP
 
 This guide provides detailed instructions for deploying the ARTCOLLAB-APP using Git, Vercel (for frontend), and Render (for backend).
 

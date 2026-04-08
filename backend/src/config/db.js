@@ -14,6 +14,7 @@ module.exports = async function connectDB() {
     retryWrites: true,
     retryReads: true,
     w: 'majority',
+    directConnection: false,
   };
 
   let lastError = null;

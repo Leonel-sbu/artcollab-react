@@ -68,7 +68,9 @@ const Services = () => {
         revisions: 3,
         budget: "",
         features: "",
-        tags: ""
+        tags: "",
+        image: null,
+        imagePreview: null
     });
 
     const [bookingData, setBookingData] = useState({
@@ -155,6 +157,9 @@ const Services = () => {
             data.append("budget", formData.budget || 0);
             data.append("features", formData.features);
             data.append("tags", formData.tags);
+            if (formData.image) {
+                data.append("image", formData.image);
+            }
 
             const res = await createService(data);
             if (res?.success) {
@@ -162,7 +167,8 @@ const Services = () => {
                 setShowCreateModal(false);
                 setFormData({
                     title: "", description: "", category: "illustration",
-                    deliveryDays: 7, revisions: 3, budget: "", features: "", tags: ""
+                    deliveryDays: 7, revisions: 3, budget: "", features: "", tags: "",
+                    image: null, imagePreview: null
                 });
                 loadData();
             } else {
@@ -380,9 +386,18 @@ const Services = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="bg-gray-800/50 border border-gray-700 overflow-hidden hover:border-purple-500/50 transition group"
-                            >
-                                {/* Card Header */}
+                                 className="bg-gray-800/50 border border-gray-700 overflow-hidden hover:border-purple-500/50 transition group"
+                             >
+                                 {service.image && (
+                                     <div className="relative h-48 overflow-hidden">
+                                         <img
+                                             src={`http://localhost:5000${service.image}`}
+                                             alt={service.title}
+                                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                         />
+                                     </div>
+                                 )}
+                                 {/* Card Header */}
                                 <div className="p-5 border-b border-gray-700">
                                     <div className="flex items-start justify-between mb-2">
                                         <span className="text-3xl">{categoryIcons[service.category] || "🎨"}</span>
@@ -611,6 +626,34 @@ const Services = () => {
                                     />
                                 </div>
 
+                                <div>
+                                    <label className="block text-sm text-gray-300 mb-2">Service Image</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files[0];
+                                            if (file) {
+                                                setFormData({
+                                                    ...formData,
+                                                    image: file,
+                                                    imagePreview: URL.createObjectURL(file)
+                                                });
+                                            }
+                                        }}
+                                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700"
+                                    />
+                                    {formData.imagePreview && (
+                                        <div className="mt-4">
+                                            <img
+                                                src={formData.imagePreview}
+                                                alt="Preview"
+                                                className="w-full h-48 object-cover rounded-lg"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
                                 <button
                                     type="submit"
                                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 rounded-lg font-semibold"
@@ -700,8 +743,17 @@ const Services = () => {
                         <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                             <div className="flex justify-between items-start mb-6">
                                 <div>
-                                    <span className="text-4xl">{categoryIcons[selectedService.category] || "🎨"}</span>
-                                    <h2 className="text-2xl font-bold mt-2">{selectedService.title}</h2>
+                                     <span className="text-4xl">{categoryIcons[selectedService.category] || "🎨"}</span>
+                                     <h2 className="text-2xl font-bold mt-2">{selectedService.title}</h2>
+                                     {selectedService.image && (
+                                         <div className="mt-4">
+                                             <img
+                                                 src={`http://localhost:5000${selectedService.image}`}
+                                                 alt={selectedService.title}
+                                                 className="w-full h-48 object-cover rounded-lg"
+                                             />
+                                         </div>
+                                     )}
                                 </div>
                                 <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-white">
                                     <X className="w-6 h-6" />

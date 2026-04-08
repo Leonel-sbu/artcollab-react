@@ -17,6 +17,9 @@ const commissionSchema = new mongoose.Schema({
   // Portfolio images
   images: { type: [String], default: [] },
 
+  // Service image
+  image: { type: String, default: null },
+
   // Pricing tiers
   pricing: {
     basic: { price: Number, description: String, deliveryDays: Number, revisions: Number },
