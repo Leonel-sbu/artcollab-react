@@ -89,6 +89,22 @@ function extractCookie(cookieArray) {
     return cookieArray.map(c => c.split(';')[0]).join('; ');
 }
 
+async function fetchCsrfToken(cookie = '') {
+    const res = await makeRequest('GET', '/api/csrf-token', {
+        cookie
+    });
+
+    if (res.status !== 200 || !res.data.csrfToken) {
+        throw new Error('Unable to fetch CSRF token');
+    }
+
+    const csrfCookie = extractCookie(res.cookie);
+    return {
+        csrfToken: res.data.csrfToken,
+        csrfCookie
+    };
+}
+
 async function test(name, fn) {
     testCount++;
     try {
@@ -139,7 +155,6 @@ async function testRegistration() {
 
 async function testLogin() {
     testUser.email = generateEmail('login');
-    testUser('login');
 
     // First register
     await makeRequest('POST', '/api/auth/register', {
@@ -331,13 +346,20 @@ async function testArtworkValidation() {
         }
     });
 
+    // Get CSRF token for authenticated request
+    const csrfData = await fetchCsrfToken(authCookie);
+    const combinedCookie = authCookie + (csrfData.csrfCookie ? '; ' + csrfData.csrfCookie : '');
+
     // Try to create artwork with invalid data
     const res = await makeRequest('POST', '/api/artworks', {
         body: {
             title: '',  // Invalid - empty
             price: 'not-a-number'  // Invalid
         },
-        cookie: authCookie
+        cookie: combinedCookie,
+        headers: {
+            'X-CSRF-Token': csrfData.csrfToken
+        }
     });
 
     assertStatus(res, 400, 'Invalid artwork should return 400');
@@ -397,36 +419,36 @@ async function runTests() {
 
     // Auth Tests
     console.log('--- Auth Flow Tests ---');
-    await testRegistration();
-    await testLogin();
-    await testLoginInvalidCredentials();
-    await testLogout();
-    await testGetMe();
+    await test('Registration', testRegistration);
+    await test('Login', testLogin);
+    await test('Invalid login credentials', testLoginInvalidCredentials);
+    await test('Logout', testLogout);
+    await test('Get /me', testGetMe);
 
     // Protected Routes
     console.log('\n--- Protected Route Tests ---');
-    await testProtectedRouteWithoutAuth();
-    await testArtworkCreateWithoutAuth();
-    await testCartWithoutAuth();
+    await test('Protected route without auth', testProtectedRouteWithoutAuth);
+    await test('Create artwork without auth', testArtworkCreateWithoutAuth);
+    await test('Cart without auth', testCartWithoutAuth);
 
     // Admin Routes
     console.log('\n--- Admin Route Tests ---');
-    await testAdminRouteWithoutAuth();
-    await testAdminRouteWithRegularUser();
+    await test('Admin route without auth', testAdminRouteWithoutAuth);
+    await test('Admin route with regular user', testAdminRouteWithRegularUser);
 
     // Validation
     console.log('\n--- Validation Tests ---');
-    await testRegistrationValidation();
-    await testArtworkValidation();
+    await test('Registration validation', testRegistrationValidation);
+    await test('Artwork validation', testArtworkValidation);
 
     // Rate Limiting
     console.log('\n--- Rate Limiting Tests ---');
-    await testLoginRateLimit();
+    await test('Login rate limit', testLoginRateLimit);
 
     // Health
     console.log('\n--- Health Check Tests ---');
-    await testHealthEndpoint();
-    await testHealthDatabaseCheck();
+    await test('Health endpoint', testHealthEndpoint);
+    await test('Health database check', testHealthDatabaseCheck);
 
     // Summary
     console.log('\n========================================');

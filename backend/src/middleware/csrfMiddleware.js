@@ -84,10 +84,16 @@ module.exports = function csrfMiddleware(req, res, next) {
             maxAge: 24 * 60 * 60 * 1000
         });
         req.csrfToken = token;
+        return next();
     }
 
-    // For other methods, verify the token (applied via verifyCsrf middleware in routes)
-    next();
+    // For state-changing requests, only verify CSRF when auth credentials are present.
+    const hasAuthToken = req.cookies && (req.cookies['auth_token'] || req.headers['authorization']);
+    if (!hasAuthToken) {
+        return next();
+    }
+
+    return verifyCsrf(req, res, next);
 };
 
 // Export both middleware functions

@@ -330,19 +330,19 @@ async function runTests() {
 
     // CSRF Tests
     console.log('--- CSRF Endpoint Tests ---');
-    await testCsrfTokenEndpointPublic();
+    await test('CSRF token endpoint public', testCsrfTokenEndpointPublic);
 
     console.log('\n--- Auth Without CSRF ---');
-    await testLoginWithoutCsrfWorks();
-    await testRegisterWithoutCsrfWorks();
-    await testLogoutWithoutCsrfWorks();
+    await test('Login without CSRF', testLoginWithoutCsrfWorks);
+    await test('Register without CSRF', testRegisterWithoutCsrfWorks);
+    await test('Logout without CSRF', testLogoutWithoutCsrfWorks);
 
     console.log('\n--- CSRF Protection ---');
-    await testStateChangeWithoutCsrfRejected();
-    await testStateChangeWithValidCsrfSucceeds();
+    await test('State change without CSRF rejected', testStateChangeWithoutCsrfRejected);
+    await test('State change with valid CSRF succeeds', testStateChangeWithValidCsrfSucceeds);
 
     console.log('\n--- GET Requests ---');
-    await testProtectedGetStillWorks();
+    await test('Protected GET without CSRF works', testProtectedGetStillWorks);
 
     // Summary
     console.log('\n========================================');

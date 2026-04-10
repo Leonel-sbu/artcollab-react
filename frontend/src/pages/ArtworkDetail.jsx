@@ -68,7 +68,13 @@ export default function ArtworkDetail() {
 
         try {
             setAddingToCart(true);
-            await cartService.addItem(artwork._id);
+            await cartService.addToCart({
+                kind: 'artwork',
+                refId: artwork._id,
+                title: artwork.title,
+                price: artwork.price,
+                qty: 1
+            });
             toast.success("Added to cart!");
         } catch (e) {
             console.error("Add to cart error:", e);

@@ -43,7 +43,7 @@ export default function Community() {
     }
 
     const fd = new FormData();
-    fd.append("content", newPost);
+    fd.append("text", newPost);
     if (image) fd.append("image", image);
 
     try {
@@ -173,11 +173,11 @@ export default function Community() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-gray-800 p-4 rounded-xl"
           >
-            <p className="mb-2">{post.content}</p>
+            {post.text && <p className="mb-2">{post.text}</p>}
 
-            {post.media?.[0] && (
+            {post.images?.[0] && (
               <img
-                src={resolveImageUrl(post.media[0])}
+                src={resolveImageUrl(post.images[0])}
                 alt="Post"
                 className="rounded mb-3 max-h-96"
               />
@@ -195,23 +195,24 @@ export default function Community() {
               {post.likesCount || 0}
             </button>
 
-            {/* COMMENTS */}
-            <div className="mt-4 space-y-2">
-              {post.comments?.map((c) => (
-                <div
-                  key={c._id}
-                  className={`text-sm p-2 rounded ${c.optimistic
-                    ? "bg-gray-800 opacity-70"
-                    : "bg-gray-900"
-                    }`}
-                >
-                  <span className="font-semibold text-blue-400">
-                    {c.user?.name}
-                  </span>{" "}
-                  {c.text}
-                </div>
-              ))}
+            {/* COMMENTS - Disabled (not yet supported) */}
+            {/* Comments feature coming soon */}
+            {false && post.comments?.map((c) => (
+              <div
+                key={c._id}
+                className={`text-sm p-2 rounded ${c.optimistic
+                  ? "bg-gray-800 opacity-70"
+                  : "bg-gray-900"
+                  }`}
+              >
+                <span className="font-semibold text-blue-400">
+                  {c.user?.name}
+                </span>{" "}
+                {c.text}
+              </div>
+            ))}
 
+            {false && (
               <div className="flex gap-2">
                 <input
                   value={commentText[post._id] || ""}
@@ -228,7 +229,7 @@ export default function Community() {
                   <Send size={16} />
                 </button>
               </div>
-            </div>
+            )}
           </motion.article>
         ))}
       </div>

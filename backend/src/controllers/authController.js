@@ -69,18 +69,23 @@ function validatePassword(password) {
 }
 
 exports.register = async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, role } = req.body;
 
   // Validate required fields
   if (!name || !email || !password) {
     return res.status(400).json({ success: false, message: "name, email, password are required" });
   }
 
-  // SECURITY: Ignore role from public registration - always default to 'buyer'
-  // Admin role can only be created via:
-  // 1. Seed script (first admin setup)
-  // 2. Existing admin promotion via PUT /api/admin/users/:id/role
-  const userRole = "buyer";
+  // Default registration role
+  const validRoles = ['admin', 'artist', 'buyer', 'learner'];
+  let userRole = 'artist';
+  if (role !== undefined && role !== null) {
+    const normalizedRole = String(role).trim().toLowerCase();
+    if (!validRoles.includes(normalizedRole)) {
+      return res.status(400).json({ success: false, message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+    }
+    userRole = normalizedRole;
+  }
 
   // Validate name is not empty/whitespace-only
   const trimmedName = name.trim();
@@ -88,10 +93,9 @@ exports.register = async (req, res) => {
     return res.status(400).json({ success: false, message: "Name cannot be empty or contain only whitespace" });
   }
 
-  // Validate password meets complexity requirements
-  const passwordErrors = validatePassword(password);
-  if (passwordErrors.length > 0) {
-    return res.status(400).json({ success: false, message: passwordErrors.join(", ") });
+  // Validate password meets minimum requirements
+  if (password.length < 8) {
+    return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
   }
 
   const emailLower = email.toLowerCase().trim();

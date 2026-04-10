@@ -1,4 +1,4 @@
-const Post = require("../models/Post");
+const CommunityPost = require("../models/CommunityPost");
 const Notification = require("../models/Notification");
 
 /* ----------------------------- LIST POSTS ----------------------------- */
@@ -8,13 +8,12 @@ exports.listPosts = async (req, res) => {
   const skip = (page - 1) * limit;
 
   const [posts, total] = await Promise.all([
-    Post.find()
-      .populate("author", "name")
-      .populate({ path: "comments.user", select: "name" })
+    CommunityPost.find()
+      .populate("user", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
-    Post.countDocuments(),
+    CommunityPost.countDocuments(),
   ]);
 
   res.json({ success: true, posts, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
@@ -22,26 +21,26 @@ exports.listPosts = async (req, res) => {
 
 /* ----------------------------- CREATE POST ---------------------------- */
 exports.createPost = async (req, res) => {
-  const { content } = req.body;
+  const { text } = req.body;
 
-  if (!content && !req.file) {
+  if (!text && !req.file) {
     return res.status(400).json({
       success: false,
       message: "Post is empty",
     });
   }
 
-  const media = req.file
+  const images = req.file
     ? [`/uploads/posts/${req.file.filename}`]
     : [];
 
-  const post = await Post.create({
-    author: req.user.id,
-    content,
-    media,
+  const post = await CommunityPost.create({
+    user: req.user.id,
+    text,
+    images,
   });
 
-  await post.populate("author", "name");
+  await post.populate("user", "name");
 
   res.status(201).json({
     success: true,
@@ -50,48 +49,17 @@ exports.createPost = async (req, res) => {
 };
 
 
-/* ----------------------------- ADD COMMENT --------------------------- */
+/* ----------------------------- ADD COMMENT (Not Supported) ------------- */
 exports.addComment = async (req, res) => {
-  const { text } = req.body;
-  const post = await Post.findById(req.params.id);
-
-  if (!post) {
-    return res.status(404).json({ success: false, message: "Post not found" });
-  }
-
-  if (!text?.trim()) {
-    return res.status(400).json({ success: false, message: "Comment required" });
-  }
-
-  post.comments.push({
-    user: req.user.id,
-    text,
-  });
-
-  post.commentsCount = post.comments.length;
-  await post.save();
-
-  if (!post.author.equals(req.user.id)) {
-    await Notification.create({
-      recipient: post.author,
-      sender: req.user.id,
-      type: "comment",
-      post: post._id,
-    });
-  }
-
-  await post.populate("comments.user", "name");
-
-  res.json({
-    success: true,
-    comments: post.comments,
-    commentsCount: post.commentsCount,
+  return res.status(501).json({
+    success: false,
+    message: "Comments are not yet supported for community posts"
   });
 };
 
 /* ----------------------------- LIKE / UNLIKE -------------------------- */
 exports.toggleLike = async (req, res) => {
-  const post = await Post.findById(req.params.id);
+  const post = await CommunityPost.findById(req.params.id);
   if (!post) {
     return res.status(404).json({ success: false, message: "Post not found" });
   }
@@ -105,9 +73,9 @@ exports.toggleLike = async (req, res) => {
     post.likes.push(userId);
     likedByMe = true;
 
-    if (!post.author.equals(userId)) {
+    if (!post.user.equals(userId)) {
       await Notification.create({
-        recipient: post.author,
+        recipient: post.user,
         sender: userId,
         type: "like",
         post: post._id,
@@ -119,12 +87,11 @@ exports.toggleLike = async (req, res) => {
     likedByMe = false;
   }
 
-  post.likesCount = post.likes.length;
   await post.save();
 
   res.json({
     success: true,
-    likesCount: post.likesCount,
+    likesCount: post.likes.length,
     likedByMe,
   });
 };

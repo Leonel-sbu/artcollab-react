@@ -13,11 +13,8 @@ export async function uploadImage(file) {
   // Use the api client which handles:
   // - withCredentials for cookies
   // - CSRF token in headers
-  const res = await api.post('/api/uploads/image', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  // NOTE: Do NOT set Content-Type header - let axios handle it automatically for multipart/form-data
+  const res = await api.post('/api/uploads/image', formData);
 
   if (!res.data?.success) {
     throw new Error(res.data?.message || 'Image upload failed');

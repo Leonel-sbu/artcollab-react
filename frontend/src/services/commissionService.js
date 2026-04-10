@@ -32,9 +32,9 @@ export async function getService(id) {
 
 // Create a new service (artist offering)
 export async function createService(formData) {
-    const { data } = await api.post("/api/commissions", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
-    });
+    // Do NOT set Content-Type header - let axios handle it automatically for multipart/form-data
+    // CSRF token will still be added by the request interceptor
+    const { data } = await api.post("/api/commissions", formData);
     return data;
 }
 

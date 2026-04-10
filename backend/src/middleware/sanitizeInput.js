@@ -10,7 +10,7 @@ const xss = require('xss');
  */
 const sanitizeString = (value) => {
     if (typeof value === 'string') {
-        return xss(value.trim());
+        return xss(value);
     }
     return value;
 };

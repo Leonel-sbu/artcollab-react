@@ -17,9 +17,15 @@ module.exports = (req, res, next) => {
             message: err.msg
         }));
 
+        let message = 'Validation failed';
+        const isRegisterRoute = req.originalUrl && req.originalUrl.startsWith('/api/auth/register');
+        if (isRegisterRoute && formattedErrors.length > 0) {
+            message = formattedErrors[0].message;
+        }
+
         return res.status(400).json({
             success: false,
-            message: 'Validation failed',
+            message,
             errors: formattedErrors
         });
     }
