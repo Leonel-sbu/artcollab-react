@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 
 // Load Stripe - using a test key placeholder
 // In production, use environment variable
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY || 'pk_test_placeholder');
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
 
 const CARD_ELEMENT_OPTIONS = {
     style: {

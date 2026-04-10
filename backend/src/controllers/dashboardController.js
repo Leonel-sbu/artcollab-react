@@ -6,11 +6,6 @@ const Course = require("../models/Course");
 
 exports.getStats = async (req, res) => {
   try {
-    // DEBUG logging
-    console.log('=== Dashboard Stats Request ===');
-    console.log('User:', req.user ? req.user.email : 'none');
-    console.log('Role:', req.user?.role);
-
     // Return empty stats for unauthenticated users
     if (!req.user) {
       return res.json({
@@ -26,11 +21,9 @@ exports.getStats = async (req, res) => {
 
     const userId = req.user._id;
     const userRole = req.user.role;
-    console.log('Checking admin:', userRole === 'admin');
 
     // If admin, show global stats
     if (userRole === 'admin') {
-      console.log('Admin detected - fetching global stats');
       const [totalArtworks, totalOrders, totalCommissions, totalCourses] = await Promise.all([
         Artwork.countDocuments({ status: 'published' }),
         Order.countDocuments({ status: 'paid' }),

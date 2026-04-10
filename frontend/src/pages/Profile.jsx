@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { cartService, formatZAR } from '../services/cartService';
+import { getDashboardStats } from '../services/dashboardService';
+import { uploadAvatar } from '../services/userService';
 import toast from 'react-hot-toast';
-import { ShoppingBag, BookOpen, TrendingUp, Users, Palette, DollarSign, Eye } from 'lucide-react';
+import { ShoppingBag, BookOpen, TrendingUp, Users, Palette, DollarSign, Eye, Camera } from 'lucide-react';
 
 export default function Profile() {
-    const { user } = useAuth();
+    const { user, refreshAuth } = useAuth();
     const navigate = useNavigate();
+    const avatarInputRef = useRef(null);
+    const [avatarUploading, setAvatarUploading] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [loading, setLoading] = useState(true);
     const [orders, setOrders] = useState([]);
@@ -40,20 +44,38 @@ export default function Profile() {
     const loadUserData = async () => {
         try {
             setLoading(true);
-            // Load orders for purchases tab
-            const ordersResponse = await cartService.getOrders();
-            if (ordersResponse.success) {
+            const [ordersResponse, statsResponse] = await Promise.all([
+                cartService.getOrders(),
+                getDashboardStats().catch(() => null),
+            ]);
+
+            if (ordersResponse?.success) {
                 setOrders(ordersResponse.items || []);
             }
-            // Stats would come from dashboard API in real app
-            setUserStats({
-                followers: 0,
-                following: 0,
-                artworks: 0,
-                sales: ordersResponse.items?.length || 0,
-                views: 0,
-                earnings: 0
-            });
+
+            // followers/following come from the live user object (populated by /api/auth/me)
+            const followersCount = Array.isArray(user?.followers) ? user.followers.length : 0;
+            const followingCount = Array.isArray(user?.following) ? user.following.length : 0;
+
+            if (statsResponse?.success) {
+                setUserStats({
+                    followers: statsResponse.data?.followers ?? followersCount,
+                    following: followingCount,
+                    artworks: statsResponse.data?.totalArtworks || 0,
+                    sales: statsResponse.data?.totalOrders || 0,
+                    views: 0,
+                    earnings: statsResponse.data?.totalSalesZAR || 0,
+                });
+            } else {
+                setUserStats({
+                    followers: followersCount,
+                    following: followingCount,
+                    artworks: 0,
+                    sales: ordersResponse?.items?.length || 0,
+                    views: 0,
+                    earnings: 0,
+                });
+            }
         } catch (error) {
             console.error('Failed to load user data:', error);
             if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
@@ -63,6 +85,26 @@ export default function Profile() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setAvatarUploading(true);
+        try {
+            const res = await uploadAvatar(file);
+            if (res?.success) {
+                toast.success('Avatar updated');
+                await refreshAuth(); // Reload user so avatar shows instantly
+            } else {
+                toast.error(res?.message || 'Upload failed');
+            }
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to upload avatar');
+        } finally {
+            setAvatarUploading(false);
+            e.target.value = '';
         }
     };
 
@@ -125,11 +167,26 @@ export default function Profile() {
                     <div className="px-4 md:px-6 pb-6">
                         <div className="flex flex-col md:flex-row items-start md:items-end -mt-16 mb-4">
                             {/* Avatar */}
-                            <div className="relative">
+                            <div className="relative group">
                                 <img
                                     src={userData.avatar}
                                     alt={userData.name}
                                     className="w-24 md:w-32 h-24 md:h-32 rounded-full border-4 border-white dark:border-gray-800 object-cover"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => avatarInputRef.current?.click()}
+                                    disabled={avatarUploading}
+                                    className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity disabled:cursor-wait"
+                                >
+                                    <Camera className="w-6 h-6 text-white" />
+                                </button>
+                                <input
+                                    ref={avatarInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    className="hidden"
+                                    onChange={handleAvatarChange}
                                 />
                             </div>
 

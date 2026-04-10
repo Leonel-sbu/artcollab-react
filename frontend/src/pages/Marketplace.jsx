@@ -1,10 +1,10 @@
 ﻿import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Filter, Search, TrendingUp, Clock } from "lucide-react";
+import { Filter, Search, TrendingUp, Clock, Users } from "lucide-react";
 import ArtworkCard from "../components/marketplace/ArtworkCard";
 import InlineLoader from "../components/shared/InlineLoader";
-import { getPublishedArtworks } from "../services/marketplaceService";
+import { getPublishedArtworks, getFeedArtworks } from "../services/marketplaceService";
 import { cartService, formatZAR } from "../services/cartService";
 import { useAuth } from "../context/AuthContext";
 
@@ -31,15 +31,20 @@ function resolveImageUrl(raw) {
 
 export default function Marketplace() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [activeTab, setActiveTab] = useState("all"); // "all" | "feed"
   const [artworks, setArtworks] = useState([]);
+  const [feedArtworks, setFeedArtworks] = useState([]);
+  const [feedMessage, setFeedMessage] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const { user } = useAuth();
   const [sortBy, setSortBy] = useState("recent");
   const [loading, setLoading] = useState(true);
+  const [feedLoading, setFeedLoading] = useState(false);
 
   // ========
-  // Load DB artworks
+  // Load all published artworks
   // ========
   useEffect(() => {
     const load = async () => {
@@ -66,6 +71,33 @@ export default function Marketplace() {
     };
     load();
   }, []);
+
+  // ========
+  // Load following feed when tab is selected
+  // ========
+  useEffect(() => {
+    if (activeTab !== "feed" || !user) return;
+    const load = async () => {
+      setFeedLoading(true);
+      try {
+        const res = await getFeedArtworks();
+        if (res?.success) {
+          setFeedArtworks(Array.isArray(res.items) ? res.items : []);
+          setFeedMessage(res.message || "");
+        }
+      } catch (e) {
+        if (e.response?.status === 401) {
+          toast.error("Please log in to view your feed.");
+          setActiveTab("all");
+        } else {
+          toast.error("Failed to load following feed");
+        }
+      } finally {
+        setFeedLoading(false);
+      }
+    };
+    load();
+  }, [activeTab, user]);
 
   // ========
   // Categories from DB (stable + sorted)
@@ -192,6 +224,81 @@ export default function Marketplace() {
           </p>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-2 mb-8">
+          <button
+            type="button"
+            onClick={() => setActiveTab("all")}
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${activeTab === "all" ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            All Artworks
+          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("feed")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-all ${activeTab === "feed" ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white" : "bg-gray-800 text-gray-300 hover:bg-gray-700"}`}
+            >
+              <Users className="w-4 h-4" />
+              Following Feed
+            </button>
+          )}
+        </div>
+
+        {/* Following Feed */}
+        {activeTab === "feed" && (
+          <div>
+            {feedLoading ? (
+              <InlineLoader />
+            ) : feedMessage ? (
+              <div className="text-center py-16">
+                <Users className="w-16 h-16 mx-auto text-gray-600 mb-4" />
+                <h3 className="text-xl font-semibold text-gray-300 mb-2">Your feed is empty</h3>
+                <p className="text-gray-500 mb-6">{feedMessage}</p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("all")}
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-sm"
+                >
+                  Browse All Artworks
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {feedArtworks.map((a) => {
+                  const name = a?.artist?.name || "Unknown Artist";
+                  const img = resolveImageUrl(a?.imageUrl);
+                  const uiA = {
+                    id: a._id,
+                    title: a.title || "Untitled",
+                    artist: name,
+                    artistAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`,
+                    price: `R ${Number(a?.price || 0).toLocaleString("en-ZA")}`,
+                    category: normalizeCategory(a?.category),
+                    imageUrl: img || "https://picsum.photos/seed/artcollab/900/600",
+                    likes: Number(a?.likes || 0),
+                    views: Number(a?.views || 0),
+                    createdAt: a?.createdAt,
+                  };
+                  return (
+                    <ArtworkCard
+                      key={uiA.id}
+                      artwork={uiA}
+                      onView={() => handleView(uiA.id)}
+                      onBuy={() => handleBuy(uiA.id)}
+                      onLike={() => handleLike(uiA.id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* All Artworks tab content below */}
+        {activeTab === "all" && (
+          <>
         {/* Filters */}
         <div className="mb-8 space-y-6">
           {/* Category Pills */}
@@ -313,6 +420,8 @@ export default function Marketplace() {
                 </button>
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </div>

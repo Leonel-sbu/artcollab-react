@@ -1,4 +1,6 @@
-﻿const Artwork = require("../models/Artwork");
+﻿const mongoose = require("mongoose");
+const Artwork = require("../models/Artwork");
+const User = require("../models/User");
 
 /**
  * Validate and sanitize a URL - prevents SSRF and XSS attacks
@@ -314,11 +316,15 @@ exports.getCategoryStats = async (req, res) => {
 exports.getUserStats = async (req, res) => {
   try {
     const userId = req.params.userId;
-    const total = await Artwork.countDocuments({ artist: userId, status: "published" });
-    const pending = await Artwork.countDocuments({ artist: userId, status: "pending" });
+    let userObjId;
+    try { userObjId = new mongoose.Types.ObjectId(userId); }
+    catch { return res.status(400).json({ success: false, message: "Invalid user ID" }); }
+
+    const total = await Artwork.countDocuments({ artist: userObjId, status: "published" });
+    const pending = await Artwork.countDocuments({ artist: userObjId, status: "pending" });
 
     const categoryStats = await Artwork.aggregate([
-      { $match: { artist: userId, status: "published" } },
+      { $match: { artist: userObjId, status: "published" } },
       { $group: { _id: "$category", count: { $sum: 1 } } }
     ]);
 
@@ -331,5 +337,43 @@ exports.getUserStats = async (req, res) => {
   } catch (err) {
     console.error("Get user stats error:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+// GET /api/artworks/feed - Artworks from artists the current user follows
+exports.getFeed = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id).select("following");
+    const followingIds = currentUser?.following || [];
+
+    if (followingIds.length === 0) {
+      return res.json({
+        success: true,
+        items: [],
+        message: "Follow some artists to see their latest work here",
+      });
+    }
+
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const skip  = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      Artwork.find({ artist: { $in: followingIds }, status: "published" })
+        .populate("artist", "name avatar role")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Artwork.countDocuments({ artist: { $in: followingIds }, status: "published" }),
+    ]);
+
+    res.json({
+      success: true,
+      items,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error("Feed error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };

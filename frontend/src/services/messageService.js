@@ -85,6 +85,17 @@ export async function getUnreadCount(abortSignal = null) {
     }
 }
 
+// Upload an image attachment for a message
+// Returns: { success, url, filename, size, mimeType }
+export async function uploadMessageAttachment(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const { data } = await api.post("/api/messages/upload", fd, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data;
+}
+
 // Legacy endpoints (for backward compatibility)
 export async function getChats() {
     const { data } = await api.get("/api/messages/chats");

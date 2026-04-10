@@ -29,13 +29,24 @@ function getCookieOptions() {
   return {
     httpOnly: true,
     secure: isProduction,
-    sameSite: 'lax', // Use 'lax' for development, 'strict' in production if needed
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    // 'none' required in production so the auth cookie is sent on cross-origin
+    // requests (frontend on onrender.com subdomain → backend on different subdomain).
+    // 'none' mandates secure:true (HTTPS), which is always true on Render/Vercel.
+    sameSite: isProduction ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   };
 }
 
 function safeUser(u) {
-  return { _id: u._id, name: u.name, email: u.email, role: u.role };
+  return {
+    _id:      u._id,
+    name:     u.name,
+    email:    u.email,
+    role:     u.role,
+    avatar:   u.avatar   || '',
+    bio:      u.bio      || '',
+    location: u.location || '',
+  };
 }
 
 /**
@@ -106,10 +117,10 @@ exports.register = async (req, res) => {
     return res.status(409).json({ success: false, message: "Email already in use" });
   }
 
-  // Hash password
-  const passwordHash = await User.hashPassword(password);
-
   try {
+    // Hash password inside try/catch so bcrypt failures are handled properly
+    const passwordHash = await User.hashPassword(password);
+
     const user = await User.create({
       name: trimmedName,
       email: emailLower,
@@ -202,7 +213,7 @@ exports.logout = async (req, res) => {
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     path: '/',
   });
 

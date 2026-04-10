@@ -85,18 +85,20 @@ const Navbar = () => {
             return;
         }
 
-        const abortController = new AbortController();
         let isMounted = true;
+        let currentController = new AbortController();
 
         const fetchUnreadCount = async () => {
+            // Each call gets its own controller so aborting the previous doesn't kill the new one
+            const controller = new AbortController();
+            currentController = controller;
             try {
-                const response = await getUnreadCount(abortController.signal);
+                const response = await getUnreadCount(controller.signal);
                 if (isMounted && response.success) {
                     setUnreadCount(response.totalUnread || 0);
                 }
             } catch (error) {
-                // Ignore abort errors (cleanup)
-                if (error.name !== 'AbortError') {
+                if (error.name !== 'AbortError' && error.code !== 'ERR_CANCELED') {
                     console.warn('Failed to fetch unread count:', error.message);
                 }
             }
@@ -104,15 +106,12 @@ const Navbar = () => {
 
         fetchUnreadCount();
 
-        // Poll every 30 seconds with new AbortController each time
-        const interval = setInterval(() => {
-            abortController.abort(); // Cancel previous request
-            fetchUnreadCount();
-        }, 30000);
+        // Poll every 30 seconds
+        const interval = setInterval(fetchUnreadCount, 30000);
 
         return () => {
             isMounted = false;
-            abortController.abort();
+            currentController.abort();
             clearInterval(interval);
         };
     }, [user]);

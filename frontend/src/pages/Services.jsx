@@ -85,7 +85,11 @@ const Services = () => {
     }, []);
 
     useEffect(() => {
-        loadData();
+        // Debounce to avoid firing on every keystroke in the search box
+        const timer = setTimeout(() => {
+            loadData();
+        }, filters.search ? 400 : 0);
+        return () => clearTimeout(timer);
     }, [activeTab, filters]);
 
     const loadCategories = async () => {

@@ -1,6 +1,7 @@
 ﻿const Commission = require("../models/Commission");
 const Notification = require("../models/Notification");
 const Conversation = require("../models/Conversation");
+const Message = require("../models/Message");
 
 /* ----------------------------- LIST COMMISSIONS ----------------------------- */
 // Public: list all commission services with filters
@@ -176,21 +177,24 @@ exports.createService = async (req, res) => {
 // Customer books/requests a commission from an artist
 exports.book = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      budget,
-      referenceFiles,
-      pricingTier,
-      artistId
-    } = req.body;
+    const { title, description, budget, referenceFiles, pricingTier } = req.body;
+    const serviceId = req.params.id;
 
     if (!title) {
       return res.status(400).json({ success: false, message: "Title is required" });
     }
 
-    if (!artistId) {
-      return res.status(400).json({ success: false, message: "Artist is required" });
+    // Look up the service to get the artist (avoids requiring artistId in the body)
+    const service = await Commission.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ success: false, message: "Service not found" });
+    }
+
+    const artistId = service.artist;
+
+    // Prevent self-booking
+    if (artistId.toString() === req.user.id.toString()) {
+      return res.status(400).json({ success: false, message: "You cannot book your own service" });
     }
 
     // Create new commission request
@@ -223,6 +227,18 @@ exports.book = async (req, res) => {
 
     await commission.populate("artist", "name email");
     await commission.populate("buyer", "name email");
+
+    // Send an automatic opening message from the buyer so the chat is not empty
+    const openingText = `Hi! I just booked your service "${service.title}". Looking forward to discussing the details with you!`;
+    const initMsg = await Message.create({
+      conversationId: conversation._id,
+      sender: req.user.id,
+      text: openingText,
+      status: 'sent',
+    });
+    await conversation.updateLastMessage(initMsg);
+    // Increment unread for artist so they see the new message
+    await conversation.incrementUnread(artistId);
 
     res.json({ success: true, item: commission, conversationId: conversation._id });
   } catch (err) {

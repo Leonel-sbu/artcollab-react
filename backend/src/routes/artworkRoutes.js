@@ -22,6 +22,7 @@ const updateArtworkValidation = [
 
 router.get('/stats/categories', c.getCategoryStats);
 router.get('/stats/user/:userId', c.getUserStats);
+router.get('/feed', protect, c.getFeed);   // Following feed — must be before /:id
 router.get('/', c.list);
 router.get('/pending', protect, c.getPending);
 router.get('/:id', c.getById);

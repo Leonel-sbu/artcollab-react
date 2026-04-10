@@ -1,8 +1,9 @@
 ﻿import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Heart, Image as ImageIcon, Send } from "lucide-react";
+import { Heart, Image as ImageIcon, Send, Flag } from "lucide-react";
 import toast from "react-hot-toast";
 import InlineLoader from "../components/shared/InlineLoader";
+import ReportModal from "../components/moderation/ReportModal";
 
 import { resolveImageUrl } from "../utils/resolveImage";
 import {
@@ -18,6 +19,7 @@ export default function Community() {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [commentText, setCommentText] = useState({});
+  const [reportTarget, setReportTarget] = useState(null); // { id, name }
 
   /* LOAD POSTS */
   useEffect(() => {
@@ -183,17 +185,27 @@ export default function Community() {
               />
             )}
 
-            <button
-              onClick={() => handleLike(post._id)}
-              className={`flex items-center gap-2 ${post.likedByMe ? "text-red-500" : "text-gray-400"
-                }`}
-            >
-              <Heart
-                className="w-5 h-5"
-                fill={post.likedByMe ? "currentColor" : "none"}
-              />
-              {post.likesCount || 0}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => handleLike(post._id)}
+                className={`flex items-center gap-2 ${post.likedByMe ? "text-red-500" : "text-gray-400"}`}
+              >
+                <Heart
+                  className="w-5 h-5"
+                  fill={post.likedByMe ? "currentColor" : "none"}
+                />
+                {post.likesCount || 0}
+              </button>
+
+              <button
+                onClick={() => setReportTarget({ id: post._id, name: `post by ${post.user?.name || 'user'}` })}
+                className="flex items-center gap-1 text-gray-500 hover:text-red-400 text-sm transition-colors"
+                title="Report post"
+              >
+                <Flag className="w-4 h-4" />
+                Report
+              </button>
+            </div>
 
             {/* COMMENTS - Disabled (not yet supported) */}
             {/* Comments feature coming soon */}
@@ -233,6 +245,14 @@ export default function Community() {
           </motion.article>
         ))}
       </div>
+
+      <ReportModal
+        isOpen={!!reportTarget}
+        onClose={() => setReportTarget(null)}
+        targetType="community_post"
+        targetId={reportTarget?.id}
+        targetName={reportTarget?.name}
+      />
     </main>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, ArrowLeft, MessageCircle, Phone, Video, MoreVertical } from 'lucide-react';
+import { Send, Paperclip, ArrowLeft, MessageCircle, Phone, Video, MoreVertical, X, Image as ImageIcon } from 'lucide-react';
 import MessageBubble from './MessageBubble';
+import { uploadMessageAttachment } from '../../services/messageService';
+import toast from 'react-hot-toast';
 
 const ChatWindow = ({
     conversation,
@@ -12,8 +14,11 @@ const ChatWindow = ({
 }) => {
     const [text, setText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [attachment, setAttachment] = useState(null); // { url, filename, size, mimeType, preview }
+    const [uploading, setUploading] = useState(false);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     const otherUser = conversation?.participants?.[0];
 
@@ -34,11 +39,44 @@ const ChatWindow = ({
         inputRef.current?.focus();
     }, [conversation]);
 
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        e.target.value = '';
+
+        setUploading(true);
+        try {
+            const preview = URL.createObjectURL(file);
+            const res = await uploadMessageAttachment(file);
+            if (res?.success) {
+                setAttachment({ url: res.url, filename: res.filename, size: res.size, mimeType: res.mimeType, preview });
+            } else {
+                toast.error(res?.message || 'Upload failed');
+                URL.revokeObjectURL(preview);
+            }
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to upload image');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const clearAttachment = () => {
+        if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
+        setAttachment(null);
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!text.trim()) return;
-        onSendMessage(text.trim());
+        if (!text.trim() && !attachment) return;
+
+        const attachmentPayload = attachment
+            ? { hasAttachment: true, type: 'image', url: attachment.url, filename: attachment.filename, size: attachment.size, mimeType: attachment.mimeType }
+            : null;
+
+        onSendMessage(text.trim(), attachmentPayload);
         setText('');
+        clearAttachment();
         inputRef.current?.focus();
     };
 
@@ -171,13 +209,45 @@ const ChatWindow = ({
 
             {/* Input */}
             <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700 bg-gray-900">
+                {/* Attachment preview */}
+                {attachment && (
+                    <div className="mb-3 relative inline-block">
+                        <img
+                            src={attachment.preview}
+                            alt="Attachment"
+                            className="h-20 rounded-lg object-cover border border-gray-700"
+                        />
+                        <button
+                            type="button"
+                            onClick={clearAttachment}
+                            className="absolute -top-2 -right-2 p-0.5 bg-gray-700 hover:bg-red-600 rounded-full transition-colors"
+                        >
+                            <X className="w-3.5 h-3.5 text-white" />
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex items-end gap-3 p-2 bg-gray-800 rounded-2xl">
                     <button
                         type="button"
-                        className="p-3 text-gray-500 hover:text-indigo-400 hover:bg-gray-700 rounded-xl transition-all duration-200"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="p-3 text-gray-500 hover:text-indigo-400 hover:bg-gray-700 rounded-xl transition-all duration-200 disabled:opacity-50"
+                        title="Attach image"
                     >
-                        <Paperclip size={20} />
+                        {uploading ? (
+                            <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                            <Paperclip size={20} />
+                        )}
                     </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
 
                     <div className="flex-1">
                         <textarea
@@ -194,8 +264,8 @@ const ChatWindow = ({
 
                     <button
                         type="submit"
-                        disabled={!text.trim()}
-                        className={`p-3 rounded-xl transition-all duration-200 ${text.trim()
+                        disabled={!text.trim() && !attachment}
+                        className={`p-3 rounded-xl transition-all duration-200 ${(text.trim() || attachment)
                                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:scale-105'
                                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                             }`}

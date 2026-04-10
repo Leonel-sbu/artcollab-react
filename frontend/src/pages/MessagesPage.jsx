@@ -125,23 +125,20 @@ const MessagesPage = () => {
         }
     };
 
-    // Handle sending a message
-    const handleSendMessage = async (text) => {
+    // Handle sending a message (text and optional attachment)
+    const handleSendMessage = async (text, attachment = null) => {
         if (!selectedConversation?._id || sending) return;
-
-        // Trim whitespace from message
-        const trimmedText = text.trim();
-        if (!trimmedText) return;
+        if (!text && !attachment) return;
 
         setSending(true);
         try {
-            const result = await sendMessage(selectedConversation._id, trimmedText);
+            const result = await sendMessage(selectedConversation._id, text, attachment);
             if (result.success && result.message) {
                 setMessages(prev => [...prev, result.message]);
                 // Update conversation last message preview
                 setConversations(prev => prev.map(c =>
                     c._id === selectedConversation._id
-                        ? { ...c, lastMessage: { text: trimmedText, sentAt: new Date() } }
+                        ? { ...c, lastMessage: { text: text || '📎 Image', sentAt: new Date() } }
                         : c
                 ));
             }

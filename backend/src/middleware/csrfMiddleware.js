@@ -1,101 +1,105 @@
 /**
  * CSRF Protection Middleware
- * Uses the new csrf package (not the deprecated csurf)
- * csrf v3.x API: https://www.npmjs.com/package/csrf
+ * Uses the csrf package (not the deprecated csurf)
+ *
+ * KEY DESIGN RULE:
+ *   Only /api/csrf-token issues a new secret+token pair.
+ *   All other GET requests pass through WITHOUT touching the cookie.
+ *   If every GET regenerated a new secret, any token obtained from
+ *   /api/csrf-token would be invalidated by the very next GET request
+ *   (e.g., fetching the community feed) — which was the original bug.
  */
 const csrf = require('csrf');
 
-// Create CSRF instance
 const tokens = new csrf();
 
-// Routes that don't need CSRF protection
-// These are authentication entry points - users can't have CSRF token before authenticating
+// Routes that skip CSRF entirely (auth entry-points + read-only infra)
 const exemptRoutes = [
-    '/api/csrf-token',               // Token endpoint must be public
-    '/api/payments/webhook',         // Stripe handles its own verification
-    '/api/health',                   // Health check doesn't modify state
-    '/api/auth/login',               // Auth entry point - no prior token
-    '/api/auth/register',            // Auth entry point - no prior token
-    '/api/auth/forgot-password',     // Auth entry point - no prior token
-    '/api/auth/reset-password',      // Auth entry point - no prior token
-    '/api/auth/logout',              // Users need to logout without having a CSRF token
+    '/api/csrf-token',           // token endpoint is the only place that issues tokens
+    '/api/payments/webhook',     // Stripe verifies its own signature
+    '/api/health',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/auth/logout',
 ];
 
-/**
- * Generate a CSRF token
- * @returns {object} - { token: string, secret: string }
- */
-const generateToken = () => {
-    const secret = tokens.secretSync();
-    const token = tokens.create(secret);
-    return { token, secret };
+const COOKIE_OPTIONS = () => {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        // 'none' required in production for cross-origin requests (same as auth cookie)
+        sameSite: isProduction ? 'none' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/',
+    };
 };
 
-// Generate CSRF token endpoint
+/**
+ * GET /api/csrf-token
+ * Always issues a fresh secret+token pair.
+ */
 const getCsrfToken = (req, res) => {
-    const { token, secret } = generateToken();
-    // Store secret in session or cookie (for simplicity, we'll send it as a cookie)
-    res.cookie('csrf-secret', secret, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    });
+    const secret = tokens.secretSync();
+    const token = tokens.create(secret);
+    res.cookie('csrf-secret', secret, COOKIE_OPTIONS());
     res.json({ csrfToken: token });
 };
 
-// Middleware to verify CSRF token on state-changing requests
+/**
+ * verifyCsrf — call this on state-changing routes that need protection.
+ * Reads the token from the X-CSRF-Token header (or _csrf body field)
+ * and the secret from the csrf-secret httpOnly cookie.
+ */
 const verifyCsrf = (req, res, next) => {
-    const token = req.body._csrf || req.headers['x-csrf-token'];
-    const secret = req.cookies['csrf-secret'];
+    const token = req.headers['x-csrf-token'] || req.body?._csrf;
+    const secret = req.cookies?.['csrf-secret'];
 
     if (!token || !secret) {
         return res.status(403).json({
             success: false,
-            message: 'CSRF token missing'
+            message: 'CSRF token missing. Fetch a token from GET /api/csrf-token first.',
         });
     }
 
     if (!tokens.verify(secret, token)) {
         return res.status(403).json({
             success: false,
-            message: 'Invalid CSRF token'
+            message: 'Invalid CSRF token. Please refresh the page and try again.',
         });
     }
 
     next();
 };
 
+/**
+ * Global CSRF middleware registered via app.use().
+ *
+ * GET  requests → always pass through (no regeneration, no verification)
+ * POST/PUT/PATCH/DELETE without an auth cookie → pass through
+ *   (unauthenticated requests cannot exploit CSRF meaningfully)
+ * POST/PUT/PATCH/DELETE with an auth cookie → verify CSRF token
+ */
 module.exports = function csrfMiddleware(req, res, next) {
-    // Skip CSRF for exempt routes
     const isExempt = exemptRoutes.some(route => req.path.startsWith(route));
+    if (isExempt) return next();
 
-    if (isExempt) {
+    // Read-only — no need for CSRF
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
         return next();
     }
 
-    // For GET requests, just generate a new token
-    if (req.method === 'GET') {
-        const { token, secret } = generateToken();
-        res.cookie('csrf-secret', secret, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 24 * 60 * 60 * 1000
-        });
-        req.csrfToken = token;
-        return next();
-    }
-
-    // For state-changing requests, only verify CSRF when auth credentials are present.
-    const hasAuthToken = req.cookies && (req.cookies['auth_token'] || req.headers['authorization']);
-    if (!hasAuthToken) {
+    // Only enforce CSRF for authenticated sessions
+    const hasAuthCookie = !!(req.cookies?.auth_token);
+    const hasAuthHeader = !!(req.headers?.authorization);
+    if (!hasAuthCookie && !hasAuthHeader) {
         return next();
     }
 
     return verifyCsrf(req, res, next);
 };
 
-// Export both middleware functions
 module.exports.getCsrfToken = getCsrfToken;
 module.exports.verifyCsrf = verifyCsrf;

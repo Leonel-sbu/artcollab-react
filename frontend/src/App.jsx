@@ -45,7 +45,7 @@ export default function App() {
         // Main container: full viewport, scrollable content
         // Uses Tailwind slate color palette for dark theme consistency
         <div className="min-h-screen flex flex-col overflow-y-auto bg-slate-950 text-white">
-            <BrowserRouter>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <ScrollRestoration />
 
                 {/* Toast notifications - dark themed */}

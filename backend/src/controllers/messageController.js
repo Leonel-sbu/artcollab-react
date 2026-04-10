@@ -3,9 +3,58 @@
  * Handles conversation and message operations
  */
 
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
+
+/* ─────────────────────── ATTACHMENT UPLOAD ─────────────────────── */
+
+const attachmentDir = path.join(process.cwd(), 'uploads', 'messages');
+fs.mkdirSync(attachmentDir, { recursive: true });
+
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, attachmentDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    cb(null, `msg-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  },
+});
+
+const attachmentUpload = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (allowed.includes(file.mimetype)) return cb(null, true);
+    cb(new Error('Only JPEG, PNG, WebP and GIF images are allowed'));
+  },
+});
+
+// Middleware exported for route to wrap (error → JSON instead of crash)
+exports.attachmentUploadMiddleware = attachmentUpload.single('file');
+
+// POST /api/messages/upload
+exports.uploadAttachment = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+    const url = `/uploads/messages/${req.file.filename}`;
+    res.json({
+      success: true,
+      url,
+      filename: req.file.originalname,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+    });
+  } catch (err) {
+    console.error('uploadAttachment error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 // ============================================
 // CONVERSATION ENDPOINTS

@@ -8,6 +8,14 @@ const { protect } = require('../middleware/protect');
 const { messageLimiter } = require('../config/rateLimits');
 const c = require('../controllers/messageController');
 
+// POST /api/messages/upload — upload image for message attachment
+router.post('/upload', protect, (req, res, next) => {
+  c.attachmentUploadMiddleware(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    next();
+  });
+}, c.uploadAttachment);
+
 // Base route
 router.get('/', (req, res) => {
   res.json({ success: true, module: 'messages' });

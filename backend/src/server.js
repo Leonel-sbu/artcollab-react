@@ -6,6 +6,7 @@ require("./utils/env");
 
 const app = require("./app");
 const connectDB = require("./config/db");
+const { startScheduler } = require("./utils/scheduler");
 
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
@@ -15,6 +16,7 @@ let server;
 async function startServer() {
   try {
     await connectDB();
+    startScheduler();
 
     server = app.listen(PORT, () => {
       if (isProduction) {

@@ -1,101 +1,127 @@
-﻿import axios from "axios";
+import axios from "axios";
 
-// Get API base URL - must be set in production!
+/* ─────────────────────── BASE URL ────────────────────────────────── */
+// In development: leave baseURL empty so every request goes through the
+// Vite dev-server proxy (vite.config.js → /api → http://localhost:5000).
+// In production: set VITE_API_BASE_URL to your deployed backend URL.
 const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  const envUrl =
+    import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
 
   if (!envUrl) {
-    // In production without VITE_API_BASE_URL, fail fast
     if (import.meta.env.PROD) {
-      throw new Error('VITE_API_BASE_URL is required in production');
+      throw new Error(
+        "VITE_API_BASE_URL must be set in production (e.g. https://api.yourdomain.com)"
+      );
     }
-    // Development: Use relative path to leverage Vite proxy
-    // This avoids CORS issues by forwarding through Vite's dev server
-    console.warn('WARNING: VITE_API_BASE_URL not set, using relative path (via Vite proxy)');
-    return '';  // Empty string = relative URL = uses Vite proxy
+    // Development default — uses Vite proxy, no CORS issues
+    return "";
   }
 
-  // Validate HTTPS in production
-  if (import.meta.env.PROD && !envUrl.startsWith('https://')) {
-    throw new Error('VITE_API_BASE_URL must use HTTPS in production');
+  if (import.meta.env.PROD && !envUrl.startsWith("https://")) {
+    throw new Error("VITE_API_BASE_URL must use HTTPS in production");
   }
 
   return envUrl;
 };
 
 const api = axios.create({
-  baseURL: getApiBaseUrl(),
-  // CRITICAL: Enable credentials for cookie-based auth
-  withCredentials: true,
+  baseURL: getApiBaseUrl() || undefined,
+  withCredentials: true, // Send httpOnly auth cookie + CSRF secret cookie
 });
 
-// CSRF token storage (in-memory for security - not localStorage)
+/* ─────────────────────── CSRF TOKEN STORE ─────────────────────────── */
+// Stored in memory only (never localStorage) — survives page navigation
+// but is cleared on full page reload, triggering a fresh fetch.
 let csrfToken = null;
 
-// Fetch CSRF token from backend
-// Call this on app initialization after user logs in
+// Deduplicated fetch — concurrent requests won't each trigger their own call
+let _fetchingCsrf = null;
+
 export async function fetchCsrfToken() {
-  try {
-    const res = await axios.get(
-      `${getApiBaseUrl()}/api/csrf-token`,
-      { withCredentials: true }
-    );
-    csrfToken = res.data.csrfToken;
-    return csrfToken;
-  } catch (error) {
-    console.error("Failed to fetch CSRF token:", error);
-    return null;
-  }
+  if (_fetchingCsrf) return _fetchingCsrf;
+
+  _fetchingCsrf = api
+    .get("/api/csrf-token")
+    .then((res) => {
+      csrfToken = res.data?.csrfToken ?? null;
+      _fetchingCsrf = null;
+      return csrfToken;
+    })
+    .catch((err) => {
+      _fetchingCsrf = null;
+      console.warn("[api] Could not fetch CSRF token:", err.message);
+      return null;
+    });
+
+  return _fetchingCsrf;
 }
 
-// Get current CSRF token
 export function getCsrfToken() {
   return csrfToken;
 }
 
-// NOTE: Token-based auth (Authorization header) has been removed.
-// Auth is now handled via httpOnly cookies set by the backend on login/register.
-// The backend protect middleware reads from cookies automatically.
-// CSRF protection is enforced via X-CSRF-Token header for state-changing requests.
+export function clearCsrfToken() {
+  csrfToken = null;
+}
 
-// Request interceptor - adds CSRF token to state-changing requests
+/* ─────────────────────── REQUEST INTERCEPTOR ─────────────────────── */
+// Attach CSRF token to every state-changing request.
 api.interceptors.request.use(
-  (config) => {
-    // Add CSRF token for state-changing methods
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method?.toUpperCase())) {
+  async (config) => {
+    const method = config.method?.toUpperCase();
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      if (!csrfToken) {
+        await fetchCsrfToken();
+      }
       if (csrfToken) {
-        config.headers['X-CSRF-Token'] = csrfToken;
+        config.headers["X-CSRF-Token"] = csrfToken;
       }
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+/* ─────────────────────── RESPONSE INTERCEPTOR ────────────────────── */
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // Enhanced error handling for better debugging
+  async (error) => {
     const status = error.response?.status;
-    const message = error.response?.data?.message;
-    const url = error.config?.url;
+    const message = error.response?.data?.message ?? "";
+    const url = error.config?.url ?? "";
 
-    // Log detailed error information
+    // Auto-retry once when the server reports an expired/invalid CSRF token.
+    // This handles the race condition where the token expires between page
+    // load and the first mutating request.
+    if (
+      status === 403 &&
+      message.toLowerCase().includes("csrf") &&
+      !error.config?._csrfRetried
+    ) {
+      csrfToken = null;
+      const fresh = await fetchCsrfToken();
+      if (fresh && error.config) {
+        error.config._csrfRetried = true;
+        error.config.headers["X-CSRF-Token"] = fresh;
+        return api(error.config);
+      }
+    }
+
+    // Structured logging for easier debugging
     if (status === 401) {
-      console.log("Auth error:", message);
+      console.warn("[api 401]", message, url);
     } else if (status === 403) {
-      console.log("Forbidden error:", message, "URL:", url);
+      console.warn("[api 403]", message, url);
     } else if (status === 404) {
-      console.log("Not found:", "URL:", url);
+      console.warn("[api 404]", url);
     } else if (status >= 500) {
-      console.log("Server error:", status, message);
-    } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-      console.error("Network error detected:", error.message, "URL:", url);
-      // Provide more context for network errors
-      error.userMessage = 'Unable to connect to server. Please check your internet connection.';
+      console.error("[api 5xx]", status, message, url);
+    } else if (!status && error.code !== 'ERR_CANCELED' && error.name !== 'AbortError') {
+      // Network error / ECONNABORTED / proxy down (not a user-initiated cancel)
+      console.error("[api network]", error.message, url);
+      error.userMessage =
+        "Cannot reach the server. Check that the backend is running.";
     }
 
     return Promise.reject(error);
