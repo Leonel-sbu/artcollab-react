@@ -1,9 +1,9 @@
+
 require("dotenv").config();
 require("express-async-errors");
 require("./utils/env");
 
 /* ------------------------------- MODELS ---------------------------------- */
-// Register all models before any route/controller is loaded
 require("./models/User");
 require("./models/Admin");
 require("./models/Artwork");
@@ -33,40 +33,18 @@ const notFound = require("./middleware/notFound");
 const errorHandler = require("./middleware/errorHandler");
 const { sanitizeObject } = require("./middleware/sanitizeInput");
 
-/* --------------------------- UPLOAD DIRECTORIES -------------------------- */
-// Guarantee these exist on every startup (critical for multer)
-["uploads", "uploads/posts", "uploads/services", "uploads/courses", "uploads/avatars", "uploads/messages"].forEach(
-  (dir) => fs.mkdirSync(path.join(process.cwd(), dir), { recursive: true })
-);
-
-/* ------------------------------- ROUTES ---------------------------------- */
-const authRoutes = require("./routes/authRoutes");
-const artworkRoutes = require("./routes/artworkRoutes");
-const courseRoutes = require("./routes/courseRoutes");
-const cartRoutes = require("./routes/cartRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const messageRoutes = require("./routes/messageRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const stripeRoutes = require("./routes/stripeRoutes");
-const uploadRoutes = require("./routes/uploadRoutes");
-const communityRoutes = require("./routes/communityRoutes");
-const commissionRoutes = require("./routes/commissionRoutes");
-const dashboardRoutes = require("./routes/dashboardRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
-const reviewRoutes = require("./routes/reviewRoutes");
-const reportRoutes = require("./routes/reportRoutes");
-const userRoutes = require("./routes/userRoutes");
-const vrVideoRoutes = require("./routes/vrVideoRoutes");
-
+/* --------------------------- CREATE APP ---------------------------------- */
 const app = express();
 
-/* ─────────────────────── PROCESS-LEVEL SAFETY NET ───────────────────── */
-// Prevent a stray unhandledRejection from killing the server mid-request.
-// express-async-errors handles errors inside route handlers, but background
-// promises (event emitters, fire-and-forget) can still escape.
+/* ─────────────────────── PROCESS SAFETY ───────────────────── */
 process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
+
+/* --------------------------- UPLOAD DIRS --------------------------------- */
+["uploads", "uploads/posts", "uploads/services", "uploads/courses", "uploads/avatars", "uploads/messages"].forEach(
+  (dir) => fs.mkdirSync(path.join(process.cwd(), dir), { recursive: true })
+);
 
 /* ----------------------------- SECURITY ---------------------------------- */
 app.use(
@@ -111,45 +89,34 @@ const corsOptions = {
     }
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-CSRF-Token",
-    "X-Requested-With",
-  ],
 };
 
 app.use(cors(corsOptions));
 
-/* ---------------------------- RATE LIMITING ------------------------------- */
+/* ---------------------------- RATE LIMIT --------------------------------- */
 const rateLimit = require("express-rate-limit");
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === "production" ? 100 : 1000,
-  message: { success: false, message: "Too many requests. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: process.env.NODE_ENV === "production" ? 100 : 1000,
+    message: { success: false, message: "Too many requests. Try again later." },
+  })
+);
 
-app.use(globalLimiter);
-
-/* ─────────────────────── COOKIE PARSER ───────────────────────────────── */
+/* ---------------------------- MIDDLEWARE --------------------------------- */
 app.use(cookieParser());
 
-/* ─────────────────────── STRIPE WEBHOOK ──────────────────────────────── */
-// CRITICAL: must be registered BEFORE express.json() so the body is still
-// the raw Buffer that Stripe needs for signature verification.
-// Once express.json() runs, the raw body is consumed and unavailable.
+/* ------------------------ STRIPE WEBHOOK (RAW) --------------------------- */
 const stripeWebhookController = require("./controllers/stripeWebhookController");
+
 app.post(
   "/api/payments/webhook",
   express.raw({ type: "application/json" }),
   stripeWebhookController.webhook
 );
 
-/* ─────────────────────── BODY PARSING ────────────────────────────────── */
+/* ---------------------------- BODY PARSER -------------------------------- */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -163,7 +130,7 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-/* --------------------------- INPUT SANITIZATION --------------------------- */
+/* ------------------------ INPUT SANITIZATION ------------------------------ */
 app.use((req, res, next) => {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
     req.body = sanitizeObject(req.body);
@@ -171,64 +138,66 @@ app.use((req, res, next) => {
   next();
 });
 
-/* --------------------------- CSRF PROTECTION ------------------------------ */
+/* ---------------------------- CSRF --------------------------------------- */
 const csrfMiddleware = require("./middleware/csrfMiddleware");
 
-// Public token endpoint — exempt from CSRF, issues fresh secret+token
 app.get("/api/csrf-token", csrfMiddleware.getCsrfToken);
-
-// Global CSRF enforcement (GET/HEAD/OPTIONS pass through; see csrfMiddleware.js)
 app.use(csrfMiddleware);
 
-/* ------------------------------ LOGGING ---------------------------------- */
+/* ----------------------------- LOGGING ----------------------------------- */
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
-/* --------------------------- STATIC FILES -------------------------------- */
+/* ---------------------------- STATIC FILES ------------------------------- */
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 /* ------------------------------- HEALTH ---------------------------------- */
 app.get("/api/health", async (req, res) => {
   try {
     const mongoose = require("mongoose");
-    const dbState = mongoose.connection.readyState;
-    const isHealthy = dbState === 1;
+    const isHealthy = mongoose.connection.readyState === 1;
 
     res.status(isHealthy ? 200 : 503).json({
       success: isHealthy,
       status: isHealthy ? "ok" : "degraded",
-      database: isHealthy ? "connected" : "disconnected",
-      timestamp: new Date().toISOString(),
     });
-  } catch (error) {
-    res.status(503).json({
-      success: false,
-      status: "error",
-      error: error.message,
-      timestamp: new Date().toISOString(),
-    });
+  } catch (err) {
+    res.status(503).json({ success: false, error: err.message });
   }
 });
 
-/* ------------------------------- API ROUTES ------------------------------ */
-app.use("/api/auth", authRoutes);
-app.use("/api/artworks", artworkRoutes);
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/community", communityRoutes);
-app.use("/api/commissions", commissionRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/courses", courseRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/payments", stripeRoutes);
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/reviews", reviewRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/vr-videos", vrVideoRoutes);
+/* ------------------------------- ROOT FIX -------------------------------- */
+// ✅ THIS FIXES YOUR RENDER ERROR
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "ArtCollab API is running 🚀",
+  });
+});
+
+app.head("/", (req, res) => {
+  res.sendStatus(200);
+});
+
+/* ------------------------------- ROUTES ---------------------------------- */
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/artworks", require("./routes/artworkRoutes"));
+app.use("/api/uploads", require("./routes/uploadRoutes"));
+app.use("/api/community", require("./routes/communityRoutes"));
+app.use("/api/commissions", require("./routes/commissionRoutes"));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
+app.use("/api/courses", require("./routes/courseRoutes"));
+app.use("/api/cart", require("./routes/cartRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
+app.use("/api/messages", require("./routes/messageRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/payments", require("./routes/stripeRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
+app.use("/api/reviews", require("./routes/reviewRoutes"));
+app.use("/api/reports", require("./routes/reportRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/vr-videos", require("./routes/vrVideoRoutes"));
 
 /* --------------------------- ERROR HANDLING ------------------------------ */
 app.use(notFound);
